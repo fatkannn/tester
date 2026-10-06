@@ -1,0 +1,1461 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulasi PR ke PO Robot</title>
+<!--
+  SIMULASI SOFTWARE INTERAKTIF — "Memproses PR AI → PO Robot"
+  File mandiri: HTML + CSS + JS, tanpa library eksternal.
+  Semua aplikasi, perusahaan, alamat web & email di sini FIKTIF.
+
+  CARA MENGUBAH CEPAT
+  - Data (nomor PR/PO, supplier, URL, pesan chat) : objek CONFIG.data di <script>.
+  - Daftar langkah                               : <script id="steps-data"> (JSON).
+  - Kondisi layar tiap langkah                   : objek SCENES di <script>.
+-->
+<style>
+:root{
+  --ink:#0f172a; --muted:#475569; --line:#e2e8f0;
+  --brand:#2563eb; --accent:#f59e0b; --ok:#15803d; --bad:#dc2626;
+  --mail:#ea580c; --web:#0284c7; --chat:#7c3aed; --erp:#0f766e;
+  --tb:48px; --dur:320ms;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:#0b1220 radial-gradient(1200px 600px at 20% -10%,#1e3a8a55,transparent),#0b1220;color:#e2e8f0;min-height:100vh;line-height:1.4}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- Kerangka halaman ---------- */
+.app{max-width:1200px;margin:0 auto;padding:16px}
+.topbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:12px;align-items:center}
+.brand .logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#7c3aed);display:grid;place-items:center;font-weight:800;color:#fff}
+.brand h1{font-size:18px;margin:0;color:#f8fafc}
+.brand p{margin:2px 0 0;font-size:13px;color:#94a3b8}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ctl{background:#1e293b;color:#f8fafc;border:1px solid #334155;border-radius:9px;padding:8px 12px;font-size:14px;min-height:40px;transition:background .2s}
+.ctl:hover:not(:disabled){background:#334155}
+.ctl:disabled{opacity:.45;cursor:not-allowed}
+.chip{font-size:13px;font-weight:700;padding:6px 10px;border-radius:999px;background:#334155;color:#f1f5f9}
+.chip.demo{background:#0369a1}.chip.try{background:#15803d}.chip.test{background:#b91c1c}
+.hud{display:grid;grid-template-columns:minmax(200px,300px) 1fr;gap:12px;margin:12px 0}
+.prog-lbl{display:flex;justify-content:space-between;font-size:13px;color:#cbd5e1;margin-bottom:6px;gap:8px}
+.bar{height:10px;background:#1e293b;border-radius:999px;overflow:hidden}
+.bar span{display:block;height:100%;width:0;background:linear-gradient(90deg,#22c55e,#84cc16);transition:width .4s ease}
+.taskbox{background:#fff;color:var(--ink);border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;border-left:6px solid var(--brand);min-height:52px}
+.taskbox p{margin:0;font-size:15px;font-weight:600}
+.taskbox .ti{font-size:20px}
+body[data-mode="test"] .taskbox{border-left-color:#b91c1c}
+body[data-mode="demo"] .taskbox{border-left-color:#0369a1}
+.foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:12.5px;color:#94a3b8;margin-top:10px}
+
+/* ---------- Monitor & layar ---------- */
+.monitor{background:#020617;border-radius:18px;padding:10px;box-shadow:0 30px 60px rgba(0,0,0,.5),inset 0 0 0 1px #1e293b}
+.screen{position:relative;overflow:hidden;overflow:clip;border-radius:10px;height:clamp(520px,62vw,680px);isolation:isolate;background:#1e40af}
+.sim{position:absolute;inset:0;overflow:hidden;overflow:clip}
+.sim.shake{animation:shake .32s}
+@keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+.wallpaper{position:absolute;inset:0;background:
+  radial-gradient(circle at 80% 20%,#38bdf855 0,transparent 40%),
+  radial-gradient(circle at 15% 85%,#a78bfa55 0,transparent 45%),
+  linear-gradient(135deg,#1e3a8a,#0e7490 60%,#155e75)}
+.desk{position:absolute;left:12px;top:12px;display:grid;gap:6px}
+.dicon{width:86px;background:transparent;border:0;border-radius:10px;padding:6px 4px;color:#fff;text-align:center;font-size:12.5px;text-shadow:0 1px 2px #000a}
+.dicon:hover{background:#ffffff26}
+.ico{position:relative;display:grid;place-items:center;width:46px;height:46px;border-radius:12px;margin:0 auto 4px;box-shadow:0 4px 10px #0004}
+.ico svg,.tb-app svg,.t-ico svg,.n-ico svg{width:60%;height:60%}
+.i-mail{background:var(--mail)}.i-web{background:var(--web)}.i-chat{background:var(--chat)}.i-files{background:#ca8a04}.i-trash{background:#64748b}
+.badge{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--bad);color:#fff;font-size:11px;font-weight:700;display:none;place-items:center;box-shadow:0 0 0 2px #fff;text-shadow:none}
+.has-badge .badge{display:grid;animation:pop .35s}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
+
+/* Taskbar */
+.taskbar{position:absolute;left:0;right:0;bottom:0;height:var(--tb);z-index:30;background:#0f172ae6;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;border-top:1px solid #ffffff1a}
+.tb-app,.tb-start{position:relative;width:40px;height:40px;border:0;border-radius:9px;background:transparent;display:grid;place-items:center}
+.tb-app:hover,.tb-start:hover{background:#ffffff1f}
+.tb-app .app-sq{width:30px;height:30px;border-radius:8px;display:grid;place-items:center}
+.tb-app::after{content:"";position:absolute;bottom:2px;left:50%;width:0;height:3px;border-radius:2px;background:#93c5fd;transform:translateX(-50%);transition:width .25s}
+.tb-app.running::after{width:8px}.tb-app.front::after{width:18px}
+.tb-start svg{width:24px;height:24px}
+.tb-search{height:32px;width:170px;border-radius:16px;background:#ffffff1a;color:#cbd5e1;font-size:13px;display:flex;align-items:center;padding:0 12px;gap:6px}
+.tray{position:absolute;right:10px;top:0;bottom:0;display:flex;align-items:center;gap:10px;color:#e2e8f0;font-size:12px}
+.clock{text-align:right;line-height:1.2}
+.clock span{display:block}
+
+/* Notifikasi */
+.notif{position:absolute;right:12px;bottom:calc(var(--tb) + 12px);z-index:40;width:min(350px,calc(100% - 24px));background:#fff;color:var(--ink);border:0;border-radius:14px;padding:12px;display:flex;gap:12px;text-align:left;box-shadow:0 14px 34px #0007;transform:translateX(calc(100% + 40px));opacity:0;visibility:hidden;transition:transform 420ms cubic-bezier(.2,.9,.25,1.15),opacity .3s,visibility 0s .42s}
+.notif.show{transform:none;opacity:1;visibility:visible;transition:transform 420ms cubic-bezier(.2,.9,.25,1.15),opacity .3s}
+.n-ico{flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center}
+.n-body{min-width:0;display:flex;flex-direction:column;gap:2px;font-size:13px}
+.n-app{font-size:11.5px;color:var(--muted)}
+.n-subj{color:#334155}
+
+/* Jendela aplikasi */
+.win{position:absolute;left:3%;right:3%;top:3%;bottom:calc(var(--tb) + 2.5%);z-index:10;background:#fff;color:var(--ink);border-radius:12px;box-shadow:0 24px 60px #0008;display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:scale(.55) translateY(35%);transform-origin:50% 100%;visibility:hidden;transition:opacity var(--dur),transform var(--dur) cubic-bezier(.2,.8,.2,1),visibility 0s linear var(--dur)}
+.win.open{opacity:1;transform:none;visibility:visible;transition:opacity var(--dur),transform var(--dur) cubic-bezier(.2,.8,.2,1)}
+.win.front{z-index:20}
+.win:focus{outline:none}
+.titlebar{flex:none;height:36px;display:flex;align-items:center;gap:8px;padding:0 4px 0 10px;background:#f1f5f9;border-bottom:1px solid var(--line);font-size:13px;font-weight:600}
+.t-ico{width:22px;height:22px;border-radius:6px;display:grid;place-items:center}
+.wctl{margin-left:auto;display:flex}
+.wctl button{width:36px;height:28px;border:0;background:transparent;border-radius:6px;color:#334155}
+.wctl button:hover{background:#e2e8f0}
+.wbody{flex:1;min-height:0;display:flex}
+
+/* ---- SurelKu (email) ---- */
+.mail{display:grid;grid-template-columns:160px minmax(230px,330px) 1fr}
+.mail-nav{background:#fff7ed;border-right:1px solid #fed7aa;padding:10px 8px;display:flex;flex-direction:column;gap:4px;overflow:auto}
+.compose{background:var(--mail);color:#fff;border:0;border-radius:10px;padding:9px;font-weight:700;margin-bottom:6px}
+.folder{display:flex;justify-content:space-between;align-items:center;text-align:left;border:0;background:transparent;border-radius:8px;padding:7px 9px;font-size:13px}
+.folder.on{background:#ffedd5;font-weight:700;color:#9a3412}
+.folder .cnt{background:var(--mail);color:#fff;border-radius:9px;font-size:11px;padding:0 6px}
+.mail-list{border-right:1px solid var(--line);overflow:auto}
+.mail-item{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #eef2f7;background:#fff;padding:10px 12px;font-size:13px}
+.mail-item:hover{background:#f8fafc}
+.mail-item .row1{display:flex;justify-content:space-between;gap:8px}
+.mail-item .from{color:#0f172a}
+.mail-item .time{color:var(--muted);font-size:11.5px;flex:none}
+.mail-item .subj{display:block;color:#1e293b;margin-top:2px}
+.mail-item .prev{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mail-item.unread{box-shadow:inset 4px 0 var(--mail)}
+.mail-item.unread .from,.mail-item.unread .subj{font-weight:700}
+.mail-item.sel{background:#ffedd5}
+.tag-robot{display:inline-block;font-size:10.5px;background:#ccfbf1;color:#115e59;border-radius:6px;padding:0 5px;margin-left:4px;font-weight:700}
+.mail-read{overflow:auto;padding:16px 22px;font-size:14px}
+.mail-read h2{font-size:17px;margin:0 0 10px}
+.mail-meta{font-size:12.5px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px}
+.mail-meta b{color:var(--ink)}
+.attach{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;margin-top:10px;background:#f8fafc}
+.attach .pdf{background:#dc2626;color:#fff;font-size:10px;font-weight:800;border-radius:4px;padding:3px 4px}
+.empty{height:100%;display:grid;place-items:center;color:#94a3b8;text-align:center;padding:20px}
+.mail-back{display:none;border:0;background:#f1f5f9;border-radius:8px;padding:6px 10px;margin-bottom:10px}
+
+/* ---- Jelajah (browser) ---- */
+.browser{flex-direction:column}
+.br-tabs{flex:none;height:32px;background:#e2e8f0;display:flex;align-items:flex-end;padding:0 10px}
+.br-tab{background:#fff;border-radius:9px 9px 0 0;padding:6px 14px;font-size:12px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.br-bar{flex:none;display:flex;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line)}
+.br-bar .nav{width:32px;height:32px;border:0;border-radius:50%;background:transparent;color:#475569;font-size:15px}
+.br-bar .nav:hover{background:#f1f5f9}
+#url-form{flex:1;display:flex;gap:6px;min-width:0}
+#url{flex:1;min-width:0;height:34px;border-radius:17px;border:1px solid #cbd5e1;background:#f8fafc;padding:0 14px;font-size:13.5px;color:var(--ink)}
+#url:focus{outline:2px solid var(--brand);background:#fff}
+#url-go{border:0;border-radius:17px;background:var(--brand);color:#fff;padding:0 14px;font-weight:600}
+.br-page{flex:1;min-height:0;position:relative;overflow:hidden;background:#f1f5f9}
+.newtab{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#475569;text-align:center;padding:20px}
+.newtab .big{font-size:34px;font-weight:800;color:var(--web);letter-spacing:-.02em}
+.typing{caret-color:transparent;box-shadow:0 0 0 2px #93c5fd}
+
+/* ---- NusaERP ---- */
+.erp{position:absolute;inset:0;display:grid;grid-template-rows:46px 1fr}
+.erp-head{background:var(--erp);color:#fff;display:flex;align-items:center;gap:10px;padding:0 14px;font-size:13px}
+.erp-head .lg{font-weight:800;font-size:16px;display:flex;align-items:center;gap:6px}
+.erp-head .lg i{width:24px;height:24px;border-radius:6px;background:#fff;color:var(--erp);display:grid;place-items:center;font-style:normal;font-size:13px}
+.erp-head .co{opacity:.9}
+.erp-head .usr{margin-left:auto;display:flex;align-items:center;gap:8px}
+.erp-head .usr span{background:#ffffff26;border-radius:999px;padding:3px 10px}
+.erp-main{display:grid;grid-template-columns:200px 1fr;min-height:0}
+.erp-side{background:#134e4a;color:#ccfbf1;overflow:auto;padding:8px}
+.erp-side .grp{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#99f6e4;padding:10px 8px 4px}
+.erp-side button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:0;color:inherit;border-radius:7px;padding:8px 10px;font-size:13px}
+.erp-side button:hover{background:#ffffff1a}
+.erp-side button.on{background:#0d9488;color:#fff;font-weight:700}
+.erp-side .ni{width:18px;text-align:center}
+.erp-content{overflow:auto;padding:14px;position:relative}
+.page-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.page-head h2{margin:0;font-size:18px}
+.muted{color:var(--muted);font-size:12.5px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.card h3{margin:0 0 10px;font-size:14px}
+.banner{background:#fff7ed;border:1px solid #fdba74;color:#7c2d12;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px}
+.tbl-wrap{overflow:auto}
+table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
+.grid th{background:#f8fafc;text-align:left;padding:8px;color:#334155;border-bottom:1px solid var(--line);white-space:nowrap}
+.grid td{padding:8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;vertical-align:middle}
+.grid td.num,.grid th.num{text-align:right}
+.show-sm{display:none}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700}
+.pill.ok{background:#dcfce7;color:#166534}.pill.draft{background:#fef3c7;color:#92400e}.pill.robot{background:#ccfbf1;color:#115e59}.pill.user{background:#e0e7ff;color:#3730a3}
+.acts{display:flex;gap:6px}
+.ib{height:30px;min-width:30px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:0 8px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px}
+.ib:hover{background:#f1f5f9}
+.ib.pdf{color:#b91c1c;border-color:#fecaca}
+.ib.upd{background:var(--brand);color:#fff;border-color:var(--brand)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.fake-in{border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-size:12.5px;color:#64748b;background:#fff;min-width:140px}
+.fgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;font-weight:600}
+.field .fake-in{color:var(--ink);min-width:0;background:#f8fafc}
+.form-foot{position:sticky;bottom:-14px;background:#fff;border-top:1px solid var(--line);margin:0 -14px -14px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 -6px 16px #0f172a14}
+.chk{display:flex;align-items:center;gap:10px;border:2px dashed #cbd5e1;background:#f8fafc;border-radius:10px;padding:8px 12px;text-align:left;font-size:13px;max-width:520px}
+.chk .box{flex:none;width:22px;height:22px;border-radius:6px;border:2px solid #64748b;background:#fff;display:grid;place-items:center;color:#fff;font-weight:900;transition:background .2s,border-color .2s}
+.chk[aria-checked="true"]{border-style:solid;border-color:#86efac;background:#f0fdf4}
+.chk[aria-checked="true"] .box{background:var(--ok);border-color:var(--ok)}
+.chk[aria-checked="true"] .box::after{content:"✓"}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:0;border-radius:9px;padding:9px 16px;font-weight:700;font-size:13.5px}
+.btn.green{background:#16a34a;color:#fff}.btn.red{background:#dc2626;color:#fff}.btn.ghost{background:#f1f5f9;color:#334155}
+.erp-toast{position:absolute;top:12px;left:50%;transform:translate(-50%,-30px);background:#166534;color:#fff;border-radius:10px;padding:10px 16px;font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:all .35s;z-index:6;box-shadow:0 10px 24px #0004;white-space:nowrap}
+.erp-toast.on{opacity:1;transform:translate(-50%,0)}
+.pdf-modal{position:absolute;inset:0;z-index:5;background:#0f172acc;display:flex;flex-direction:column;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s}
+.pdf-modal.open{opacity:1;visibility:visible;transition:opacity .3s}
+.pdf-bar{flex:none;display:flex;align-items:center;gap:8px;background:#1e293b;color:#fff;padding:7px 10px;font-size:13px}
+.pdf-bar .sp{margin-left:auto}
+.pdf-bar button{border:0;border-radius:8px;padding:7px 12px;font-weight:700}
+.pdf-dl{background:#334155;color:#fff}
+#pdf-close{background:#fff;color:#0f172a}
+.pdf-scroll{flex:1;overflow:auto;padding:16px}
+.paper{background:#fff;max-width:700px;margin:0 auto;padding:26px;font-size:12px;box-shadow:0 10px 30px #0006;transform:scale(.97);transition:transform .3s}
+.pdf-modal.open .paper{transform:none}
+.paper h1{text-align:center;font-size:18px;margin:6px 0 14px}
+.paper .co{font-size:11px;color:var(--muted)}
+.paper .co b{display:block;font-size:13px;color:var(--ink)}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 20px;margin-bottom:12px}
+.kv div{display:grid;grid-template-columns:110px 1fr}
+.kv span:first-child{color:var(--muted)}
+.paper table{width:100%;border-collapse:collapse}
+.paper th,.paper td{border:1px solid #cbd5e1;padding:5px 6px;text-align:left}
+.paper th{background:#f1f5f9}
+.paper .num{text-align:right}
+.paper .sign{display:flex;justify-content:space-between;gap:10px;margin-top:14px;font-size:11px;color:var(--muted)}
+
+/* ---- KabarIn (chat) ---- */
+.chat{display:grid;grid-template-columns:270px 1fr}
+.chat-list{background:#faf5ff;border-right:1px solid #e9d5ff;overflow:auto}
+.chat-search{margin:10px;border-radius:9px;background:#fff;border:1px solid #e9d5ff;padding:7px 10px;font-size:12.5px;color:#64748b}
+.chat-item{display:flex;gap:10px;width:100%;border:0;background:transparent;text-align:left;padding:10px 12px;border-bottom:1px solid #f3e8ff}
+.chat-item:hover{background:#f3e8ff}
+.chat-item.sel{background:#ede9fe}
+.av{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px}
+.ci-body{min-width:0;flex:1;font-size:13px}
+.ci-top{display:flex;justify-content:space-between;gap:6px}
+.ci-top b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-top small{color:var(--muted);flex:none}
+.ci-last{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-room{display:flex;flex-direction:column;min-height:0;background:#f5f3ff}
+.room{display:flex;flex-direction:column;min-height:0;flex:1}
+.room-head{flex:none;display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff;border-bottom:1px solid #e9d5ff;font-size:13px}
+.room-head small{display:block;color:var(--muted)}
+.room-back{display:none;border:0;background:transparent;font-size:18px}
+.msgs{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
+.day{align-self:center;font-size:11px;background:#e9d5ff;color:#581c87;border-radius:999px;padding:2px 10px}
+.msg{max-width:78%;background:#fff;border-radius:12px;padding:8px 10px;font-size:13px;box-shadow:0 1px 2px #0001;animation:msgIn .3s ease}
+.msg.me{align-self:flex-end;background:#ede9fe}
+.msg .who{font-size:11.5px;font-weight:800;color:#7c3aed}
+.msg .tm{font-size:10.5px;color:var(--muted);text-align:right;margin-top:2px}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.dots{display:inline-flex;gap:4px;padding:4px 2px}
+.dots i{width:7px;height:7px;border-radius:50%;background:#a78bfa;animation:dot 1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,60%,100%{transform:none;opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+.chat-form{flex:none;display:flex;gap:8px;align-items:flex-end;padding:8px 10px;background:#fff;border-top:1px solid #e9d5ff}
+#chat-input{flex:1;resize:none;border:1px solid #d8b4fe;border-radius:12px;padding:8px 12px;font:inherit;font-size:13.5px;color:var(--ink);min-height:42px}
+#chat-input:focus{outline:2px solid var(--chat)}
+#chat-send{flex:none;width:42px;height:42px;border:0;border-radius:50%;background:var(--chat);color:#fff;font-size:17px}
+
+/* ---------- Lapisan efek: highlight, tooltip, kursor ---------- */
+.fx{position:absolute;inset:0;pointer-events:none;z-index:60}
+.ring{position:absolute;border:3px solid var(--accent);border-radius:10px;opacity:0;transition:opacity .25s;animation:pulse 1.3s infinite}
+.ring.on{opacity:1}
+.ring.strong{border-color:#ef4444;border-width:4px;animation-name:pulse2}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #f59e0baa}70%{box-shadow:0 0 0 14px #f59e0b00}100%{box-shadow:0 0 0 0 #f59e0b00}}
+@keyframes pulse2{0%{box-shadow:0 0 0 0 #ef4444bb}70%{box-shadow:0 0 0 20px #ef444400}100%{box-shadow:0 0 0 0 #ef444400}}
+.tip{position:absolute;left:0;top:0;width:max-content;max-width:min(300px,calc(100% - 20px));background:#111827;color:#fff;border-radius:11px;padding:10px 12px;font-size:13.5px;line-height:1.45;box-shadow:0 10px 26px #0007;opacity:0;transition:opacity .25s}
+.tip.on{opacity:1}
+.tip .st{display:block;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#fcd34d;margin-bottom:2px}
+.tip code{background:#ffffff26;border-radius:4px;padding:0 4px;word-break:break-all}
+.tip.hint{background:#fef3c7;color:#451a03;border:2px solid var(--accent)}
+.tip.hint .st{color:#b45309}
+.tip.hint code{background:#fde68a}
+.tip::after{content:"";position:absolute;left:var(--ax,50%);width:12px;height:12px;background:inherit;transform:translateX(-50%) rotate(45deg)}
+.tip.below::after{top:-6px}
+.tip.above::after{bottom:-6px}
+.tip.hint.below::after{top:-8px;border-left:2px solid var(--accent);border-top:2px solid var(--accent)}
+.tip.hint.above::after{bottom:-8px;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent)}
+.cursor{position:absolute;left:0;top:0;width:28px;height:28px;opacity:0;transition:transform 780ms cubic-bezier(.45,.05,.25,1),opacity .2s;filter:drop-shadow(0 2px 3px #0008);transform:translate(50%,50%)}
+.cursor.on{opacity:1}
+.cursor.wiggle svg{animation:wig .5s 2}
+@keyframes wig{50%{transform:translate(-5px,-5px)}}
+.ripple{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;border:3px solid var(--accent);animation:rip .5s ease-out forwards}
+@keyframes rip{from{transform:scale(.3);opacity:1}to{transform:scale(1.6);opacity:0}}
+.feedback{position:absolute;top:14px;left:50%;transform:translate(-50%,-24px);max-width:calc(100% - 24px);background:var(--bad);color:#fff;border-radius:999px;padding:9px 18px;font-weight:700;font-size:14px;text-align:center;opacity:0;transition:opacity .25s,transform .25s;box-shadow:0 10px 24px #0006}
+.feedback.on{opacity:1;transform:translate(-50%,0)}
+.feedback.info{background:#0369a1}.feedback.muted{background:#334155}
+
+/* ---------- Overlay mulai & selesai ---------- */
+.overlay{position:absolute;inset:0;z-index:80;background:#020617c4;backdrop-filter:blur(3px);display:flex;padding:16px;overflow:auto;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s}
+.overlay.on{opacity:1;visibility:visible;transition:opacity .3s}
+.sheet{margin:auto;background:#fff;color:var(--ink);border-radius:18px;width:100%;max-width:760px;padding:22px;box-shadow:0 30px 70px #000a}
+.sheet h2{margin:0 0 4px;font-size:21px}
+.sheet .lead{margin:0 0 14px;color:var(--muted);font-size:14px}
+.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.mode-card{border:2px solid var(--line);border-radius:14px;background:#fff;padding:14px;text-align:left;transition:border-color .2s,transform .2s,box-shadow .2s}
+.mode-card:hover,.mode-card:focus-visible{border-color:var(--brand);transform:translateY(-2px);box-shadow:0 10px 20px #2563eb22}
+.mode-card .mi{font-size:26px}
+.mode-card b{display:block;font-size:16px;margin:4px 0}
+.mode-card span{font-size:13px;color:var(--muted)}
+.learn{margin:14px 0 0;padding:12px 14px;background:#f8fafc;border-radius:12px;font-size:13px}
+.learn ol{margin:6px 0 0;padding-left:20px;columns:2;column-gap:24px}
+.score{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}
+.score .circle{width:110px;height:110px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:800;color:#fff;background:conic-gradient(var(--c,#16a34a) calc(var(--p,0)*1%),#e2e8f0 0);position:relative}
+.score .circle::before{content:"";position:absolute;inset:10px;border-radius:50%;background:#fff}
+.score .circle span{position:relative;color:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:1;min-width:240px}
+.stat{background:#f8fafc;border-radius:10px;padding:8px 10px}
+.stat b{display:block;font-size:18px}
+.stat span{font-size:12px;color:var(--muted)}
+.verdict{display:inline-block;font-weight:800;border-radius:8px;padding:3px 10px;font-size:13px}
+.verdict.pass{background:#dcfce7;color:#166534}.verdict.fail{background:#fee2e2;color:#991b1b}.verdict.neutral{background:#e0e7ff;color:#3730a3}
+.steplist{max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin:0;padding:6px 10px 6px 34px;font-size:13px}
+.steplist li{padding:3px 0}
+.end-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.end-btns button{border:0;border-radius:10px;padding:10px 16px;font-weight:700;background:#f1f5f9;color:var(--ink)}
+.end-btns button.primary{background:var(--brand);color:#fff}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+
+/* ---------- Responsif ---------- */
+@media (max-width:760px){
+  .app{padding:12px}
+  .hud{grid-template-columns:1fr}
+  .brand h1{font-size:16px}
+  .monitor{padding:4px;border-radius:12px}
+  .screen{height:max(560px,calc(100vh - 250px))}
+  .win{left:0;right:0;top:0;bottom:var(--tb);border-radius:0}
+  .tb-search,.clock .d,.tray .tic{display:none}
+  .desk{grid-template-columns:repeat(3,auto)}
+  .mail{grid-template-columns:1fr}
+  .mail-nav{display:none}
+  .mail-read{display:none}
+  .mail.reading .mail-list{display:none}
+  .mail.reading .mail-read{display:block}
+  .mail-back{display:inline-block}
+  .erp-main{grid-template-columns:64px 1fr}
+  .erp-side{padding:4px}
+  .erp-side .grp{display:none}
+  .erp-side button{flex-direction:column;gap:2px;padding:7px 2px;font-size:9.5px;text-align:center;line-height:1.15}
+  .erp-head .co,.erp-head .usr span{display:none}
+  .erp-content{padding:8px}
+  .form-foot{bottom:-8px;margin:0 -8px -8px;padding:8px}
+  .hide-sm{display:none}
+  .show-sm{display:table;margin-top:3px}
+  .grid{font-size:11.5px}
+  .grid th,.grid td{padding:6px 5px}
+  .grid td{white-space:normal;word-break:break-word}
+  .grid td:last-child{white-space:nowrap}
+  .fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kv{grid-template-columns:1fr}
+  .paper{padding:14px}
+  .chat{grid-template-columns:1fr}
+  .chat .chat-room{display:none}
+  .chat.inroom .chat-list{display:none}
+  .chat.inroom .chat-room{display:flex}
+  .room-back{display:block}
+  .modes{grid-template-columns:1fr}
+  .learn ol{columns:1}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body data-mode="">
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">▶</div>
+      <div>
+        <h1>Simulasi: Memproses PR AI → PO Robot</h1>
+        <p>Pelatihan Purchasing · semua aplikasi di simulasi ini fiktif</p>
+      </div>
+    </div>
+    <div class="controls">
+      <span class="chip" id="mode-chip">Belum mulai</span>
+      <button class="ctl" id="btn-pause" type="button" hidden>⏸ Jeda</button>
+      <button class="ctl" id="btn-prev" type="button" disabled>← Langkah sebelumnya</button>
+      <button class="ctl" id="btn-restart" type="button" disabled>↺ Ulangi</button>
+      <button class="ctl" id="btn-mode" type="button">⇄ Ganti mode</button>
+      <button class="ctl" id="btn-sound" type="button" aria-pressed="true" aria-label="Suara: aktif">🔊</button>
+    </div>
+  </header>
+
+  <div class="hud">
+    <div>
+      <div class="prog-lbl"><span id="prog-txt">Langkah 0/0</span><span id="stats"></span></div>
+      <div class="bar" id="bar" role="progressbar" aria-label="Kemajuan simulasi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="bar-fill"></span></div>
+    </div>
+    <div class="taskbox"><span class="ti" id="task-ico" aria-hidden="true">🎯</span><p id="task-txt" aria-live="polite">Pilih mode untuk memulai simulasi.</p></div>
+  </div>
+
+  <div class="monitor">
+    <div class="screen" id="screen">
+      <!-- ================= DESKTOP PALSU ================= -->
+      <div class="sim" id="sim">
+        <div class="wallpaper" aria-hidden="true"></div>
+
+        <div class="desk" role="group" aria-label="Ikon desktop">
+          <button class="dicon" id="dk-mail" type="button"><span class="ico i-mail"><span data-ico="mail"></span><span class="badge" aria-hidden="true"></span></span>SurelKu</button>
+          <button class="dicon" id="dk-browser" type="button"><span class="ico i-web"><span data-ico="web"></span></span>Jelajah</button>
+          <button class="dicon" id="dk-chat" type="button"><span class="ico i-chat"><span data-ico="chat"></span></span>KabarIn</button>
+          <button class="dicon" id="dk-files" type="button"><span class="ico i-files"><span data-ico="files"></span></span>Dokumen</button>
+          <button class="dicon" id="dk-trash" type="button"><span class="ico i-trash"><span data-ico="trash"></span></span>Sampah</button>
+        </div>
+
+        <!-- Aplikasi email fiktif: SurelKu -->
+        <section class="win" id="win-mail" tabindex="-1" aria-label="Aplikasi email SurelKu" inert>
+          <div class="titlebar"><span class="t-ico i-mail" data-ico="mail"></span>SurelKu Mail — Kotak Masuk
+            <div class="wctl"><button type="button" aria-label="Kecilkan">–</button><button type="button" aria-label="Perbesar">▢</button><button type="button" aria-label="Tutup">✕</button></div></div>
+          <div class="wbody mail" id="mail">
+            <nav class="mail-nav" aria-label="Folder email">
+              <button class="compose" type="button">✎ Tulis Email</button>
+              <button class="folder on" type="button">📥 Kotak Masuk <span class="cnt" id="mail-cnt" hidden>1</span></button>
+              <button class="folder" type="button">📤 Terkirim</button>
+              <button class="folder" type="button">📝 Draf</button>
+              <button class="folder" type="button">🗑 Sampah</button>
+            </nav>
+            <div class="mail-list" id="mail-list"></div>
+            <article class="mail-read" id="mail-read" aria-live="polite"></article>
+          </div>
+        </section>
+
+        <!-- Browser fiktif: Jelajah -->
+        <section class="win browser" id="win-browser" tabindex="-1" aria-label="Browser Jelajah" inert>
+          <div class="titlebar"><span class="t-ico i-web" data-ico="web"></span>Jelajah
+            <div class="wctl"><button type="button" aria-label="Kecilkan">–</button><button type="button" aria-label="Perbesar">▢</button><button type="button" aria-label="Tutup">✕</button></div></div>
+          <div class="br-tabs"><div class="br-tab" id="br-tab">Tab baru</div></div>
+          <div class="br-bar">
+            <button class="nav" type="button" aria-label="Kembali">←</button>
+            <button class="nav" type="button" aria-label="Maju">→</button>
+            <button class="nav" type="button" aria-label="Muat ulang">⟳</button>
+            <form id="url-form" autocomplete="off">
+              <label class="sr" for="url">Alamat website</label>
+              <input id="url" type="text" inputmode="url" spellcheck="false" autocapitalize="off" placeholder="Ketik alamat website di sini…">
+              <button id="url-go" type="submit">Buka</button>
+            </form>
+          </div>
+          <div class="br-page" id="br-page">
+            <div class="newtab" id="newtab"><div class="big">Jelajah</div><div>Ketik alamat website pada kolom di atas, lalu tekan <b>Enter</b>.</div></div>
+            <div class="erp" id="erp" hidden></div>
+            <div class="pdf-modal" id="pdf-modal" role="dialog" aria-label="Pratinjau PDF" inert>
+              <div class="pdf-bar"><span id="pdf-title">dokumen.pdf</span><span class="sp"></span><button class="pdf-dl" type="button">⬇ Unduh</button><button id="pdf-close" type="button">✕ Tutup</button></div>
+              <div class="pdf-scroll"><div class="paper" id="pdf-paper"></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Aplikasi chat fiktif: KabarIn -->
+        <section class="win" id="win-chat" tabindex="-1" aria-label="Aplikasi chat KabarIn" inert>
+          <div class="titlebar"><span class="t-ico i-chat" data-ico="chat"></span>KabarIn
+            <div class="wctl"><button type="button" aria-label="Kecilkan">–</button><button type="button" aria-label="Perbesar">▢</button><button type="button" aria-label="Tutup">✕</button></div></div>
+          <div class="wbody chat" id="chat">
+            <div class="chat-list" id="chat-list"><div class="chat-search" aria-hidden="true">🔍 Cari atau mulai chat baru</div></div>
+            <div class="chat-room">
+              <div class="empty" id="room-empty">Pilih chat di sebelah kiri untuk mulai mengobrol.</div>
+              <div class="room" id="room" hidden>
+                <div class="room-head"><button class="room-back" type="button" aria-label="Kembali ke daftar chat">←</button><span class="av" id="room-av"></span><div><b id="room-name"></b><small id="room-sub"></small></div></div>
+                <div class="msgs" id="msgs" aria-live="polite"></div>
+                <form class="chat-form" id="chat-form">
+                  <label class="sr" for="chat-input">Tulis pesan</label>
+                  <textarea id="chat-input" rows="2" placeholder="Tulis pesan…"></textarea>
+                  <button id="chat-send" type="submit" aria-label="Kirim pesan">➤</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notifikasi (slide-in kanan bawah) -->
+        <button class="notif" id="notif" type="button" inert>
+          <span class="n-ico i-mail" data-ico="mail"></span>
+          <span class="n-body"><span class="n-app">SurelKu · baru saja</span><strong class="n-from"></strong><span class="n-subj"></span></span>
+        </button>
+
+        <!-- Taskbar -->
+        <div class="taskbar" role="toolbar" aria-label="Taskbar">
+          <button class="tb-start" id="tb-start" type="button" aria-label="Menu mulai"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#38bdf8"/><path d="M8 12l3 3 5-6" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></button>
+          <div class="tb-search" aria-hidden="true">🔍 Cari</div>
+          <button class="tb-app" id="tb-mail" type="button" aria-label="SurelKu (email)"><span class="app-sq i-mail" data-ico="mail"></span><span class="badge" aria-hidden="true"></span></button>
+          <button class="tb-app" id="tb-browser" type="button" aria-label="Jelajah (browser)"><span class="app-sq i-web" data-ico="web"></span></button>
+          <button class="tb-app" id="tb-chat" type="button" aria-label="KabarIn (chat)"><span class="app-sq i-chat" data-ico="chat"></span></button>
+          <button class="tb-app" id="tb-files" type="button" aria-label="Dokumen"><span class="app-sq i-files" data-ico="files"></span></button>
+          <div class="tray"><span class="tic" aria-hidden="true">📶 🔈</span><div class="clock" aria-label="Jam"><span id="clk-t">--:--</span><span class="d" id="clk-d"></span></div></div>
+        </div>
+      </div>
+
+      <!-- ================= LAPISAN EFEK ================= -->
+      <div class="fx" aria-hidden="true">
+        <div class="ring" id="ring"></div>
+        <div class="tip" id="tip"></div>
+        <div class="cursor" id="cursor"><svg viewBox="0 0 24 24" width="28" height="28"><path d="M3 2l7.5 19 2.6-7.4L20.5 11z" fill="#fff" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+        <div class="feedback" id="feedback"></div>
+      </div>
+      <div class="sr" id="sr-live" aria-live="assertive"></div>
+
+      <!-- ================= LAYAR MULAI ================= -->
+      <div class="overlay on" id="ov-start" role="dialog" aria-modal="true" aria-labelledby="start-title">
+        <div class="sheet">
+          <h2 id="start-title">Memproses PR AI → PO Robot</h2>
+          <p class="lead">Anda berperan sebagai staf Purchasing. Ikuti alurnya dari email PR masuk sampai konfirmasi ke supplier. Pilih cara belajar:</p>
+          <div class="modes">
+            <button class="mode-card" type="button" data-mode="demo"><span class="mi" aria-hidden="true">👀</span><b>Lihat (Demo)</b><span>Simulasi berjalan sendiri. Kursor bergerak &amp; mengklik otomatis. Cocok untuk pertama kali.</span></button>
+            <button class="mode-card" type="button" data-mode="try"><span class="mi" aria-hidden="true">👆</span><b>Coba (Latihan)</b><span>Anda klik sendiri. Bagian yang benar diberi tanda berkedip &amp; petunjuk.</span></button>
+            <button class="mode-card" type="button" data-mode="test"><span class="mi" aria-hidden="true">📝</span><b>Uji (Tes)</b><span>Tanpa tanda &amp; petunjuk. Kesalahan dan waktu dihitung untuk nilai.</span></button>
+          </div>
+          <div class="learn"><b>Yang akan Anda pelajari:</b>
+            <ol>
+              <li>Membuka email PR dari Intranet Notification</li>
+              <li>Masuk ke NusaERP lewat browser</li>
+              <li>Memeriksa PDF Purchase Request</li>
+              <li>Membuka PO yang dibuat Robot</li>
+              <li>Cek, approve &amp; simpan PO</li>
+              <li>Mengecek email PO dari Robot</li>
+              <li>Konfirmasi ke supplier lewat grup chat</li>
+            </ol>
+          </div>
+          <p class="note">Keyboard: <b>Tab</b> untuk pindah, <b>Enter</b> untuk klik.</p>
+        </div>
+      </div>
+
+      <!-- ================= LAYAR SELESAI ================= -->
+      <div class="overlay" id="ov-end" role="dialog" aria-modal="true" aria-labelledby="end-title" inert>
+        <div class="sheet" id="end-sheet"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><span id="lms-status">LMS: memeriksa…</span><span>Tips: jika bingung di mode Coba, klik di mana saja — setelah 2× salah, petunjuk lebih jelas akan muncul.</span></div>
+</div>
+
+<!--
+  =====================================================================
+  DATA LANGKAH (JSON). Satu objek = satu langkah. Urutan array = urutan alur.
+  - id        : nama unik langkah
+  - scene     : kondisi layar SEBELUM langkah ini dikerjakan (kunci di SCENES)
+  - aksi      : "click" atau "type"
+  - target    : selector CSS elemen yang benar (boleh beberapa, dipisah koma;
+                yang pertama dipakai untuk highlight/kursor demo)
+  - instruksi : tooltip di mode Lihat & Coba
+  - tugas     : kalimat tugas di mode Uji (tanpa menyebut letak tombol)
+  - petunjuk  : petunjuk jelas setelah 2× salah
+  - teks      : (khusus "type") teks yang harus diketik
+  - cocok     : (khusus "type") "tepat" = harus sama persis lalu Enter,
+                "panduan" = ketik tombol apa saja, teks terisi otomatis
+  - terima    : (opsional) daftar jawaban lain yang juga dianggap benar
+  {nama} akan diganti dengan nilai dari CONFIG.data
+  =====================================================================
+-->
+<script type="application/json" id="steps-data">
+[
+  {"id":"notif-email","scene":"notif-pr","aksi":"click","target":"#notif, #tb-mail, #dk-mail",
+   "instruksi":"Ada email PR baru masuk. Klik notifikasi di pojok kanan bawah.",
+   "tugas":"Buka email Purchase Request yang baru masuk.",
+   "petunjuk":"Lihat kotak putih di pojok kanan bawah layar (di atas jam). Klik kotak itu — atau klik ikon amplop oranye yang ada angka merahnya."},
+  {"id":"buka-email-pr","scene":"mail-inbox","aksi":"click","target":"#mail-pr",
+   "instruksi":"Klik email dari Intranet Notification: \"Purchase Request {pr} - {outlet} - {tglPR}\".",
+   "tugas":"Buka email PR dari Intranet Notification.",
+   "petunjuk":"Email dengan tulisan tebal (belum dibaca) dari Intranet Notification, berjudul Purchase Request {pr}."},
+  {"id":"buka-browser","scene":"mail-read-pr","aksi":"click","target":"#tb-browser, #dk-browser",
+   "instruksi":"Email berisi PR outlet {outlet}. Sekarang buka browser Jelajah lewat ikon bola dunia di taskbar.",
+   "tugas":"Buka browser untuk masuk ke sistem NusaERP.",
+   "petunjuk":"Ikon bola dunia biru di taskbar (bar paling bawah layar), di sebelah kanan ikon amplop."},
+  {"id":"ketik-url","scene":"browser-new","aksi":"type","target":"#url, #url-go","teks":"{url}","cocok":"tepat","terima":[],
+   "instruksi":"Klik kolom alamat, ketik <code>{url}</code> lalu tekan Enter.",
+   "tugas":"Buka halaman Purchase Request di NusaERP (alamat: {url}).",
+   "petunjuk":"Klik kolom alamat di bagian atas browser. Ketik persis: <code>{url}</code> lalu tekan Enter atau klik tombol Buka."},
+  {"id":"lihat-pdf-pr","scene":"erp-pr","aksi":"click","target":"#pr-pdf-0294",
+   "instruksi":"Cari PR {pr} di tabel, lalu klik tombol PDF untuk melihat isinya.",
+   "tugas":"Lihat dokumen PDF dari PR {pr}.",
+   "petunjuk":"Baris PR {pr}, kolom Aksi paling kanan — tombol merah bertulisan PDF."},
+  {"id":"tutup-pdf-pr","scene":"erp-pr-pdf","aksi":"click","target":"#pdf-close",
+   "instruksi":"Periksa daftar barang & tanggal kedatangan di PR. Jika sudah, klik Tutup.",
+   "tugas":"Selesai memeriksa PR, tutup dokumen PDF.",
+   "petunjuk":"Tombol putih \"✕ Tutup\" di kanan atas dokumen."},
+  {"id":"menu-po","scene":"erp-pr","aksi":"click","target":"#nav-po",
+   "instruksi":"Buka fitur Purchase Order di menu kiri untuk melihat PO yang dibuat Robot.",
+   "tugas":"Buka daftar Purchase Order.",
+   "petunjuk":"Menu hijau di sebelah kiri, tepat di bawah \"Purchase Request\": klik \"Purchase Order\"."},
+  {"id":"update-po","scene":"erp-po","aksi":"click","target":"#po-edit-0497",
+   "instruksi":"Robot membuat PO per supplier dari PR {pr}. Klik Update pada PO {po} untuk {supplier}.",
+   "tugas":"Buka PO untuk supplier {supplier} yang berasal dari PR {pr}.",
+   "petunjuk":"Cari baris dengan PR Number {pr} DAN supplier {supplier} (PO {po}), lalu klik tombol biru \"Update\"."},
+  {"id":"approve-po","scene":"erp-po-form","aksi":"click","target":"#po-approve",
+   "instruksi":"Cek supplier, tanggal kedatangan, qty dan harga. Lalu centang kotak persetujuan (approval).",
+   "tugas":"Setujui (approve) PO setelah dicek.",
+   "petunjuk":"Kotak bergaris putus-putus \"Sudah saya cek… Setujui PO\" di bagian bawah formulir."},
+  {"id":"simpan-po","scene":"erp-po-form-ok","aksi":"click","target":"#po-save",
+   "instruksi":"Klik Simpan untuk menyimpan PO.",
+   "tugas":"Simpan PO.",
+   "petunjuk":"Tombol hijau \"💾 Simpan\" di kanan bawah formulir."},
+  {"id":"pdf-po","scene":"erp-po-saved","aksi":"click","target":"#po-pdf",
+   "instruksi":"PO tersimpan dengan status Authorized. Klik Cetak PDF untuk melihat hasilnya.",
+   "tugas":"Lihat PDF PO yang sudah disimpan.",
+   "petunjuk":"Tombol merah \"📄 Cetak PDF\" di sebelah tombol Simpan."},
+  {"id":"tutup-pdf-po","scene":"erp-po-pdf","aksi":"click","target":"#pdf-close",
+   "instruksi":"Periksa PDF PO (supplier, barang, total). Klik Tutup jika sudah.",
+   "tugas":"Tutup dokumen PDF PO.",
+   "petunjuk":"Tombol putih \"✕ Tutup\" di kanan atas dokumen."},
+  {"id":"cek-email-robot","scene":"notif-robot","aksi":"click","target":"#notif, #tb-mail",
+   "instruksi":"Robot otomatis mengirim email PO ke supplier (Anda mendapat salinan/CC). Klik notifikasinya untuk mengecek.",
+   "tugas":"Pastikan email PO dari Robot sudah terkirim ke supplier.",
+   "petunjuk":"Notifikasi baru muncul di pojok kanan bawah. Klik kotak tersebut, atau ikon amplop di taskbar."},
+  {"id":"buka-chat","scene":"mail-read-robot","aksi":"click","target":"#tb-chat, #dk-chat",
+   "instruksi":"Email PO sudah terkirim. Sekarang buka KabarIn (ikon balon chat ungu) untuk konfirmasi ke supplier.",
+   "tugas":"Buka aplikasi chat untuk konfirmasi ke supplier.",
+   "petunjuk":"Ikon balon chat ungu di taskbar bawah."},
+  {"id":"pilih-grup","scene":"chat-list","aksi":"click","target":"#chat-grp",
+   "instruksi":"Klik grup \"PO Supplier – {supplierPendek}\".",
+   "tugas":"Buka grup chat supplier {supplierPendek}.",
+   "petunjuk":"Grup paling atas di daftar chat, bertuliskan PO Supplier – {supplierPendek}."},
+  {"id":"tulis-pesan","scene":"chat-room","aksi":"type","target":"#chat-input","teks":"{pesanChat}","cocok":"panduan",
+   "instruksi":"Klik kolom pesan, lalu tekan tombol huruf apa saja — pesan konfirmasi akan terisi otomatis (1 kata per ketukan).",
+   "tugas":"Tulis pesan untuk menanyakan apakah email PO sudah diterima supplier.",
+   "petunjuk":"Kolom \"Tulis pesan…\" di bagian bawah jendela chat. Klik, lalu tekan huruf apa saja berulang kali sampai pesan lengkap."},
+  {"id":"kirim-pesan","scene":"chat-typed","aksi":"click","target":"#chat-send",
+   "instruksi":"Klik tombol Kirim.",
+   "tugas":"Kirim pesan ke grup supplier.",
+   "petunjuk":"Tombol bulat ungu dengan tanda panah ➤ di kanan kolom pesan."}
+]
+</script>
+
+<script>
+(function () {
+'use strict';
+
+/* =====================================================================
+   1. KONFIGURASI — ubah di sini untuk menyesuaikan data
+   ===================================================================== */
+const CONFIG = {
+  nilaiLulus: 80,            // skor minimal "LULUS" di mode Uji
+  bantuanUjiSetelah: 3,      // mode Uji: tampilkan petunjuk setelah N salah (0 = tidak pernah). Langkah ditandai "dibantu" & bernilai 0.
+  kecepatanDemo: 1,          // 1 = normal, 2 = 2x lebih cepat
+  sceneAkhir: 'chat-done',   // scene yang diputar setelah langkah terakhir
+  data: {
+    perusahaan: 'PT Rasa Makmur Sejahtera',
+    pr: 'PR202609090294',
+    po: 'PO202609090497',
+    outlet: 'TKCP',
+    cabang: 'Outlet Taman Kota',
+    tglPR: '09/09/2026',
+    tglDatang: '11-09-2026',
+    supplier: 'PT Sayur Segar Lestari',
+    supplierPendek: 'Sayur Segar Lestari',
+    supplierKode: 'PT_SAYUR_SEGAR_LESTARI',
+    url: 'erp.nusaerp.test/purchase-request-order/index',
+    pengirimPR: 'Intranet Notification',
+    emailPR: 'noreply@rasamakmur.test',
+    robot: 'Robot NusaERP',
+    emailRobot: 'robot@nusaerp.test',
+    pesanChat: 'Selamat pagi Bapak/Ibu, PO {po} sudah dikirim Robot NusaERP lewat email. Mohon konfirmasi apakah email PO sudah diterima, dan barang diproses sesuai tanggal kedatangan {tglDatang}. Terima kasih.'
+  }
+};
+const D = CONFIG.data;
+const tpl = s => typeof s === 'string' ? s.replace(/\{(\w+)\}/g, (m, k) => (k in D ? tpl(String(D[k])) : m)) : s;
+
+const STEPS = JSON.parse(document.getElementById('steps-data').textContent).map(st => {
+  const o = {};
+  for (const k in st) o[k] = Array.isArray(st[k]) ? st[k].map(tpl) : tpl(st[k]);
+  return o;
+});
+
+/* =====================================================================
+   2. SCENES — kondisi layar (deklaratif). render() menerapkannya ke DOM,
+      sehingga "Langkah sebelumnya" selalu menghasilkan layar yang sama.
+   ===================================================================== */
+const BASE = {
+  notif: null,                 // null | 'pr' | 'robot'
+  sound: null,                 // 'ding' saat scene dimulai
+  fx: null,                    // nama efek di FX
+  front: null,                 // jendela paling depan: 'mail' | 'browser' | 'chat'
+  badge: { mail: 0 },
+  mail: { open: false, sel: null, robot: false },
+  browser: { open: false, url: '', page: null, modal: null, approved: false, saved: false },
+  chat: { open: false, room: false, text: '', sent: false }
+};
+function merge(a, b) {
+  const out = JSON.parse(JSON.stringify(a));
+  for (const k in b) out[k] = (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) ? merge(out[k] || {}, b[k]) : b[k];
+  return out;
+}
+const ext = (prev, over) => merge(merge(prev, { notif: null, sound: null, fx: null }), over);
+
+const SCENES = {};
+SCENES['idle']            = merge(BASE, {});
+SCENES['notif-pr']        = ext(SCENES.idle, { notif: 'pr', sound: 'ding', badge: { mail: 1 } });
+SCENES['mail-inbox']      = ext(SCENES['notif-pr'], { mail: { open: true }, front: 'mail' });
+SCENES['mail-read-pr']    = ext(SCENES['mail-inbox'], { mail: { sel: 'pr' }, badge: { mail: 0 } });
+SCENES['browser-new']     = ext(SCENES['mail-read-pr'], { browser: { open: true }, front: 'browser' });
+SCENES['erp-pr']          = ext(SCENES['browser-new'], { browser: { url: '{url}', page: 'pr' } });
+SCENES['erp-pr-pdf']      = ext(SCENES['erp-pr'], { browser: { modal: 'pr' } });
+SCENES['erp-po']          = ext(SCENES['erp-pr'], { browser: { page: 'po' } });
+SCENES['erp-po-form']     = ext(SCENES['erp-po'], { browser: { page: 'po-form' } });
+SCENES['erp-po-form-ok']  = ext(SCENES['erp-po-form'], { browser: { approved: true } });
+SCENES['erp-po-saved']    = ext(SCENES['erp-po-form-ok'], { browser: { saved: true }, fx: 'toastSaved' });
+SCENES['erp-po-pdf']      = ext(SCENES['erp-po-saved'], { browser: { modal: 'po' } });
+SCENES['notif-robot']     = ext(SCENES['erp-po-saved'], { notif: 'robot', sound: 'ding', badge: { mail: 1 }, mail: { robot: true } });
+SCENES['mail-read-robot'] = ext(SCENES['notif-robot'], { mail: { sel: 'robot' }, badge: { mail: 0 }, front: 'mail' });
+SCENES['chat-list']       = ext(SCENES['mail-read-robot'], { chat: { open: true }, front: 'chat' });
+SCENES['chat-room']       = ext(SCENES['chat-list'], { chat: { room: true } });
+SCENES['chat-typed']      = ext(SCENES['chat-room'], { chat: { text: '{pesanChat}' } });
+SCENES['chat-done']       = ext(SCENES['chat-typed'], { chat: { text: '', sent: true }, fx: 'supplierReply' });
+
+/* =====================================================================
+   3. KONTEN APLIKASI FIKTIF
+   ===================================================================== */
+const ICONS = {
+  mail: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="#fff"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5" fill="none" stroke="#ea580c" stroke-width="2"/></svg>',
+  web: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="#fff" stroke-width="1.6"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="#fff"/><circle cx="9" cy="10.5" r="1.3" fill="#7c3aed"/><circle cx="12.5" cy="10.5" r="1.3" fill="#7c3aed"/><circle cx="16" cy="10.5" r="1.3" fill="#7c3aed"/></svg>',
+  files: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7l2 2h9v11H3z" fill="#fff"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 13H7zM4 7h16M9 7V4h6v3" fill="none" stroke="#fff" stroke-width="2"/></svg>'
+};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rp = n => n.toLocaleString('id-ID');
+const qty = n => n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function terbilang(n) {
+  const a = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+  n = Math.floor(n);
+  const j = (x, s) => (x ? s + ' ' + terbilang(x) : s);
+  if (n < 12) return a[n];
+  if (n < 20) return terbilang(n - 10) + ' Belas';
+  if (n < 100) return j(n % 10, terbilang(Math.floor(n / 10)) + ' Puluh');
+  if (n < 200) return j(n - 100, 'Seratus');
+  if (n < 1000) return j(n % 100, terbilang(Math.floor(n / 100)) + ' Ratus');
+  if (n < 2000) return j(n - 1000, 'Seribu');
+  if (n < 1e6) return j(n % 1000, terbilang(Math.floor(n / 1000)) + ' Ribu');
+  if (n < 1e9) return j(n % 1e6, terbilang(Math.floor(n / 1e6)) + ' Juta');
+  return String(n);
+}
+
+const MAILS = [
+  { id: 'robot', from: D.robot, addr: D.emailRobot, subj: `PO_${D.supplierKode}_${D.outlet}_${D.tglDatang}`, time: '10:05', prev: `Dear ${D.supplier}, berikut saya kirimkan PO 1 lembar…`, robot: true },
+  { id: 'pr', from: D.pengirimPR, addr: D.emailPR, subj: `Purchase Request ${D.pr} - ${D.outlet} - ${D.tglPR}`, time: '08:12', prev: 'Dear Tim Purchasing, berikut kami lampirkan Purchase Request…' },
+  { id: 'promo', from: 'Tim Marketing', subj: 'Info Promo Oktober untuk semua outlet', time: 'Kemarin', prev: 'Berikut materi promo yang berlaku mulai tanggal 1…' },
+  { id: 'so', from: 'Admin Outlet', subj: 'Jadwal Stock Opname bulan ini', time: 'Kemarin', prev: 'Mohon disiapkan form stock opname untuk…' },
+  { id: 'fin', from: 'Finance', subj: 'Rekap Penjualan Mingguan', time: 'Sen', prev: 'Terlampir rekap penjualan minggu lalu…' }
+];
+const PR_ITEMS = [
+  ['BRS-001', 'Beras Putih Premium', 'KG', 10], ['TLR-002', 'Telur Ayam', 'KG', 15], ['TAH-003', 'Tahu Sutra', 'PCK', 24],
+  ['SYR-011', 'Selada Keriting', 'KG', 1.5], ['SYR-012', 'Daun Bawang', 'KG', 1], ['SYR-013', 'Jamur Tiram', 'KG', 5],
+  ['SYR-014', 'Kol Hijau', 'KG', 20], ['SYR-015', 'Wortel', 'KG', 1]
+];
+const PO_ITEMS = [  // hanya barang dari supplier sayur → Robot memecah PR per supplier
+  ['SYR-011', 'Selada Keriting', 'KG', 1.5, 25000], ['SYR-012', 'Daun Bawang', 'KG', 1, 24000],
+  ['SYR-013', 'Jamur Tiram', 'KG', 5, 27000], ['SYR-014', 'Kol Hijau', 'KG', 20, 8000], ['SYR-015', 'Wortel', 'KG', 1, 16000]
+];
+const PO_TOTAL = PO_ITEMS.reduce((s, r) => s + r[3] * r[4], 0);
+const PRS = [
+  { code: D.pr, date: '09-09-2026', req: '11-09-2026', branch: D.cabang, info: 'Dari sistem AI (PR Suggestion)' },
+  { code: 'PR202609090287', date: '09-09-2026', req: '12-09-2026', branch: 'Outlet Pasar Baru', info: 'Dari sistem AI (PR Suggestion)' },
+  { code: 'PR202609080311', date: '08-09-2026', req: '10-09-2026', branch: 'Outlet Kota Lama', info: 'Input manual' }
+];
+const POS = [
+  { no: 'PO202609090498', supplier: 'PT Beras Jaya Abadi', pr: D.pr, by: 'robot', status: 'Draft' },
+  { no: D.po, supplier: D.supplier, pr: D.pr, by: 'robot', status: 'Draft' },
+  { no: 'PO202609090496', supplier: 'CV Telur Makmur', pr: D.pr, by: 'robot', status: 'Draft' },
+  { no: 'PO202609090495', supplier: 'CV Bumbu Nusantara', pr: 'PR202609090287', by: 'robot', status: 'Draft' },
+  { no: 'PO202609080480', supplier: 'PT Minyak Sentosa', pr: 'PR202609080311', by: 'user', status: 'Authorized' }
+];
+const CHATS = [
+  { id: 'chat-grp', name: `PO Supplier – ${D.supplierPendek}`, last: 'Pak Budi: Baik Bu, siap 🙏', time: 'Kemarin', av: '🛒', color: '#16a34a' },
+  { id: 'chat-outlet', name: `Grup Outlet ${D.outlet}`, last: 'Kepala Outlet: Stok tahu tinggal sedikit', time: '09:40', av: 'O', color: '#0284c7' },
+  { id: 'chat-telur', name: 'PO Supplier – CV Telur Makmur', last: 'Anda: Terima kasih Pak', time: 'Sen', av: '🥚', color: '#ca8a04' },
+  { id: 'chat-info', name: 'Info Purchasing', last: 'Rapat mingguan hari Jumat jam 10', time: 'Sen', av: 'i', color: '#64748b' }
+];
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+function buildMail() {
+  $('#mail-list').innerHTML = MAILS.map(m => `
+    <button type="button" class="mail-item" id="mail-${m.id}" data-mail="${m.id}">
+      <span class="row1"><span class="from">${esc(m.from)}${m.robot ? '<span class="tag-robot">ROBOT</span>' : ''}</span><span class="time">${m.time}</span></span>
+      <span class="subj">${esc(m.subj)}</span><span class="prev">${esc(m.prev)}</span>
+    </button>`).join('');
+}
+function mailBody(id) {
+  const m = MAILS.find(x => x.id === id);
+  if (!m) return '<div class="empty">📭<br>Pilih email untuk dibaca.</div>';
+  const back = '<button type="button" class="mail-back">← Kotak Masuk</button>';
+  if (id === 'pr') return `${back}<h2>${esc(m.subj)}</h2>
+    <div class="mail-meta"><b>${esc(m.from)}</b> &lt;${esc(m.addr)}&gt;<br>Kepada: Tim Purchasing · ${D.tglPR} ${m.time}</div>
+    <p>Dear Tim Purchasing,</p>
+    <p>Berikut kami lampirkan Purchase Request<br>Outlet : <b>${D.outlet}</b> (${esc(D.cabang)})<br>Tanggal Kedatangan : <b>${D.tglDatang}</b></p>
+    <p>Terima kasih.</p><p class="muted">[Email ini dikirim melalui PR Suggestion System]</p>
+    <span class="attach"><span class="pdf">PDF</span>${D.pr}.pdf · 84 KB</span>`;
+  if (id === 'robot') return `${back}<h2>${esc(m.subj)}</h2>
+    <div class="mail-meta"><b>${esc(m.from)}</b> &lt;${esc(m.addr)}&gt;<br>Kepada: ${esc(D.supplier)} · <b>CC: Tim Purchasing</b> · hari ini ${m.time}</div>
+    <p>Dear <b>${esc(D.supplier.toUpperCase())}</b>,</p>
+    <p>Berikut saya kirimkan PO <b>1 LEMBAR</b> untuk kedatangan tanggal <b>${D.tglDatang}</b>.<br>Mohon diproses dan dikirimkan sesuai tanggal kedatangan PO.</p>
+    <p><b>PS.</b><br>Mohon reply email ini apabila sudah menerima PO.<br>Apabila ada perubahan harga dan barang kosong mohon segera diinfokan.<br>Pastikan invoice sesuai dengan harga yang tertera pada PO.</p>
+    <p>Terima kasih.<br>Best Regards,<br><b>Purchasing Dept</b></p>
+    <span class="attach"><span class="pdf">PDF</span>${D.po}.pdf · 61 KB</span>`;
+  return `${back}<h2>${esc(m.subj)}</h2><div class="mail-meta"><b>${esc(m.from)}</b></div><p>${esc(m.prev)}</p>`;
+}
+
+function buildERP() {
+  const side = (id, ni, label) => `<button type="button" id="${id}"><span class="ni" aria-hidden="true">${ni}</span>${label}</button>`;
+  $('#erp').innerHTML = `
+  <div class="erp-head"><span class="lg"><i>N</i>NusaERP</span><span class="co">${esc(D.perusahaan)}</span>
+    <span class="usr"><span>🔔 3</span><span>👤 Purchasing ▾</span></span></div>
+  <div class="erp-main">
+    <nav class="erp-side" aria-label="Menu NusaERP">
+      ${side('nav-dash', '🏠', 'Dashboard')}
+      <div class="grp">Purchasing</div>
+      ${side('nav-pr', '📋', 'Purchase Request')}
+      ${side('nav-po', '🧾', 'Purchase Order')}
+      ${side('nav-gr', '📦', 'Penerimaan Barang')}
+      ${side('nav-ret', '↩️', 'Retur Pembelian')}
+      <div class="grp">Lainnya</div>
+      ${side('nav-stock', '🏬', 'Inventori')}
+      ${side('nav-rep', '📊', 'Laporan')}
+    </nav>
+    <main class="erp-content" id="erp-content">
+      <div class="erp-toast" id="erp-toast" role="status"></div>
+
+      <section class="page" data-page="pr">
+        <div class="page-head"><h2>Purchase Request</h2><span class="muted">Menampilkan 1–3 dari 3 data</span></div>
+        <div class="card">
+          <div class="filters"><span class="fake-in">🔍 Cari PR Code…</span><span class="fake-in hide-sm">Status: Semua ▾</span></div>
+          <div class="tbl-wrap"><table class="grid">
+            <thead><tr><th>#</th><th>PR Code</th><th class="hide-sm">PR Date</th><th class="hide-sm">Required Date</th><th class="hide-sm">Branch</th><th class="hide-sm">Info</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody>${PRS.map((p, i) => `<tr><td>${i + 1}</td><td><b>${p.code}</b></td><td class="hide-sm">${p.date}</td><td class="hide-sm">${p.req}</td><td class="hide-sm">${esc(p.branch)}</td><td class="hide-sm">${esc(p.info)}</td><td><span class="pill ok">Authorized</span></td>
+              <td><span class="acts"><button type="button" class="ib pdf" id="pr-pdf-${p.code.slice(-4)}" aria-label="PDF ${p.code}">PDF</button><button type="button" class="ib" aria-label="Edit ${p.code}">✎</button></span></td></tr>`).join('')}</tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <section class="page" data-page="po" hidden>
+        <div class="page-head"><h2>Purchase Order</h2><span class="muted">Menampilkan 1–${POS.length} dari ${POS.length} data</span></div>
+        <div class="banner">⚠️ <b>Perhatian:</b> PO bertanda <span class="pill robot">🤖 Robot</span> dibuat otomatis dari PR AI. Mohon dicek, lalu disimpan (approval).</div>
+        <div class="card"><div class="tbl-wrap"><table class="grid">
+          <thead><tr><th class="hide-sm">#</th><th>PO Number</th><th>Supplier</th><th>PR Number</th><th class="hide-sm">PO Date</th><th class="hide-sm">Required Date</th><th class="hide-sm">Dibuat oleh</th><th class="hide-sm">Status</th><th>Aksi</th></tr></thead>
+          <tbody>${POS.map((p, i) => `<tr><td class="hide-sm">${i + 1}</td><td><b>${p.no}</b>${p.by === 'robot' ? '<span class="show-sm pill robot">🤖 Robot</span>' : ''}</td><td>${esc(p.supplier)}</td><td>${p.pr}</td><td class="hide-sm">09-09-2026</td><td class="hide-sm">${D.tglDatang}</td>
+            <td class="hide-sm">${p.by === 'robot' ? '<span class="pill robot">🤖 Robot</span>' : '<span class="pill user">👤 User</span>'}</td>
+            <td class="hide-sm"><span class="pill ${p.status === 'Draft' ? 'draft' : 'ok'}">${p.status}</span></td>
+            <td><button type="button" class="ib upd" id="po-edit-${p.no.slice(-4)}" aria-label="Update ${p.no}">✎ Update</button></td></tr>`).join('')}</tbody>
+        </table></div></div>
+      </section>
+
+      <section class="page" data-page="po-form" hidden>
+        <div class="page-head"><h2>Update Purchase – ${D.po}</h2><span class="pill draft" id="po-status">Draft · dibuat Robot</span></div>
+        <div class="card"><h3>Transaction Information</h3>
+          <div class="fgrid">
+            ${[['Branch', D.cabang], ['Purchase Date', '09-09-2026'], ['Required Date (Kedatangan)', D.tglDatang], ['Supplier', D.supplier], ['Purchase Request Number', D.pr], ['Currency', 'Rupiah (IDR)'], ['PIC Supplier', 'Pak Budi'], ['Due Day', '21 hari'], ['Project', '-']]
+              .map(([k, v]) => `<div class="field"><label>${k}</label><div class="fake-in">${esc(v)}</div></div>`).join('')}
+          </div></div>
+        <div class="card"><h3>Detail Barang</h3><div class="tbl-wrap"><table class="grid">
+          <thead><tr><th>Kode</th><th>Nama Barang</th><th>Unit</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Total</th></tr></thead>
+          <tbody>${PO_ITEMS.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="num">${qty(r[3])}</td><td class="num">${rp(r[4])}</td><td class="num">${rp(r[3] * r[4])}</td></tr>`).join('')}
+            <tr><td colspan="5" class="num"><b>Grand Total</b></td><td class="num"><b>${rp(PO_TOTAL)}</b></td></tr></tbody>
+        </table></div></div>
+        <div class="form-foot">
+          <button type="button" class="chk" id="po-approve" role="checkbox" aria-checked="false"><span class="box" aria-hidden="true"></span><span>Sudah saya cek (supplier, tanggal kedatangan, qty &amp; harga) — <b>Setujui PO</b></span></button>
+          <span class="btns"><button type="button" class="btn ghost" id="po-cancel">Batal</button><button type="button" class="btn green" id="po-save">💾 Simpan</button><button type="button" class="btn red" id="po-pdf" hidden>📄 Cetak PDF</button></span>
+        </div>
+      </section>
+    </main>
+  </div>`;
+}
+function paperPR() {
+  return `<div class="co">Company:<b>${esc(D.perusahaan)}</b></div><h1>Purchase Request</h1>
+  <div class="kv"><div><span>Branch</span><span>: ${esc(D.cabang)}</span></div><div><span>PR Code</span><span>: ${D.pr}</span></div>
+  <div><span>PR Date</span><span>: 09-Sep-2026</span></div><div><span>Required Date</span><span>: <b>11-Sep-2026</b></span></div></div>
+  <table><thead><tr><th>No</th><th>Kode</th><th>Nama Barang</th><th>Unit</th><th class="num">Qty</th><th>Notes</th></tr></thead>
+  <tbody>${PR_ITEMS.map((r, i) => `<tr><td>${i + 1}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="num">${qty(r[3])}</td><td>KEBUTUHAN OPS</td></tr>`).join('')}</tbody></table>
+  <div class="sign"><span>Created by: PR Suggestion System (AI)</span><span>Authorized by: Kepala Outlet ${D.outlet}</span></div>`;
+}
+function paperPO() {
+  return `<div class="co">Company:<b>${esc(D.perusahaan)}</b></div><h1>Purchase Order</h1>
+  <div class="kv"><div><span>Purchase Type</span><span>: Goods</span></div><div><span>PO Number</span><span>: ${D.po}</span></div>
+  <div><span>Supplier</span><span>: <b>${esc(D.supplier)}</b></span></div><div><span>Purchase Date</span><span>: 09-Sep-2026</span></div>
+  <div><span>Branch</span><span>: ${esc(D.cabang)}</span></div><div><span>Required Date</span><span>: <b>11-Sep-2026</b></span></div>
+  <div><span>PR Number</span><span>: ${D.pr}</span></div><div><span>Currency</span><span>: IDR</span></div></div>
+  <table><thead><tr><th>No</th><th>Nama Barang</th><th>Unit</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Total</th></tr></thead>
+  <tbody>${PO_ITEMS.map((r, i) => `<tr><td>${i + 1}</td><td>${r[1]}</td><td>${r[2]}</td><td class="num">${qty(r[3])}</td><td class="num">${rp(r[4])}</td><td class="num">${rp(r[3] * r[4])}</td></tr>`).join('')}
+  <tr><td colspan="5"><b>${terbilang(PO_TOTAL)} Rupiah</b></td><td class="num"><b>${rp(PO_TOTAL)}</b></td></tr></tbody></table>
+  <div class="sign"><span>Status: <b style="color:#15803d">Authorized</b></span><span>Authorized by: Tim Purchasing</span></div>`;
+}
+function buildChat() {
+  $('#chat-list').insertAdjacentHTML('beforeend', CHATS.map(c => `
+    <button type="button" class="chat-item" id="${c.id}"><span class="av" style="background:${c.color}">${c.av}</span>
+      <span class="ci-body"><span class="ci-top"><b>${esc(c.name)}</b><small>${c.time}</small></span><span class="ci-last">${esc(c.last)}</span></span></button>`).join(''));
+  const g = CHATS[0];
+  $('#room-av').textContent = g.av; $('#room-av').style.background = g.color;
+  $('#room-name').textContent = g.name; $('#room-sub').textContent = 'Pak Budi, Bu Sari, Anda';
+}
+const nowHM = () => new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+function bubble(who, text, me, time) {
+  return `<div class="msg${me ? ' me' : ''}">${who ? `<div class="who">${esc(who)}</div>` : ''}<div class="tx">${esc(text)}</div><div class="tm">${time}${me ? ' ✓✓' : ''}</div></div>`;
+}
+function renderMsgs(st) {
+  let h = '<span class="day">Kemarin</span>' + bubble('Pak Budi (Supplier)', 'Selamat sore Bu, PO minggu lalu sudah kami kirim semua ya.', false, '16:20')
+        + bubble('', 'Baik Pak, terima kasih.', true, '16:25') + bubble('Pak Budi (Supplier)', 'Baik Bu, siap 🙏', false, '16:26')
+        + '<span class="day">Hari ini</span>';
+  if (st.chat.sent) h += bubble('', tpl('{pesanChat}'), true, nowHM());
+  $('#msgs').innerHTML = h;
+  $('#msgs').scrollTop = 1e6;
+}
+
+/* =====================================================================
+   4. RENDER SCENE KE DOM
+   ===================================================================== */
+const sim = $('#sim'), screen = $('#screen');
+function setWin(name, open, front) {
+  const w = $('#win-' + name), tb = $('#tb-' + name);
+  w.classList.toggle('open', open); w.classList.toggle('front', !!front); w.inert = !open;
+  if (tb) { tb.classList.toggle('running', open); tb.classList.toggle('front', !!front); }
+}
+function render(st) {
+  // Jendela
+  setWin('mail', st.mail.open, st.front === 'mail');
+  setWin('browser', st.browser.open, st.front === 'browser');
+  setWin('chat', st.chat.open, st.front === 'chat');
+
+  // Email
+  $('#mail-robot').hidden = !st.mail.robot;
+  $('#mail-robot').classList.toggle('unread', st.mail.robot && st.mail.sel !== 'robot');
+  $('#mail-pr').classList.toggle('unread', st.mail.sel !== 'pr' && !st.mail.robot);
+  $$('.mail-item').forEach(b => b.classList.toggle('sel', b.dataset.mail === st.mail.sel));
+  $('#mail-read').innerHTML = mailBody(st.mail.sel);
+  $('#mail').classList.toggle('reading', !!st.mail.sel);
+  $('#mail-cnt').hidden = !st.badge.mail;
+  $('#mail-cnt').textContent = st.badge.mail;
+
+  // Browser & ERP
+  const b = st.browser, loaded = !!b.url;
+  $('#url').value = tpl(b.url);
+  $('#url').classList.remove('typing');
+  $('#newtab').hidden = loaded; $('#erp').hidden = !loaded;
+  $('#br-tab').textContent = !loaded ? 'Tab baru' : (b.page === 'pr' ? 'NusaERP · Purchase Request' : 'NusaERP · Purchase Order');
+  if (loaded) {
+    $$('#erp .page').forEach(p => { p.hidden = p.dataset.page !== b.page; });
+    $('#nav-pr').classList.toggle('on', b.page === 'pr');
+    $('#nav-po').classList.toggle('on', b.page !== 'pr');
+    $('#po-approve').setAttribute('aria-checked', String(!!b.approved));
+    $('#po-pdf').hidden = !b.saved;
+    $('#po-status').className = 'pill ' + (b.saved ? 'ok' : 'draft');
+    $('#po-status').textContent = b.saved ? 'Authorized ✓' : 'Draft · dibuat Robot';
+  }
+  const modal = $('#pdf-modal');
+  if (b.modal) {
+    $('#pdf-paper').innerHTML = b.modal === 'pr' ? paperPR() : paperPO();
+    $('#pdf-title').textContent = (b.modal === 'pr' ? D.pr : D.po) + '.pdf';
+    $('.pdf-scroll').scrollTop = 0;
+  }
+  modal.classList.toggle('open', !!b.modal); modal.inert = !b.modal;
+  $('#erp-toast').classList.remove('on');
+
+  // Chat
+  $('#chat').classList.toggle('inroom', st.chat.room);
+  $('#chat-grp').classList.toggle('sel', st.chat.room);
+  $('#room').hidden = !st.chat.room; $('#room-empty').hidden = st.chat.room;
+  $('#chat-input').value = tpl(st.chat.text);
+  $('#chat-input').classList.remove('typing');
+  renderMsgs(st);
+
+  // Notifikasi
+  const n = $('#notif');
+  if (st.notif) {
+    const m = MAILS.find(x => x.id === st.notif);
+    $('.n-from', n).textContent = m.from;
+    $('.n-subj', n).textContent = m.subj;
+    $('.n-app', n).textContent = 'SurelKu · baru saja' + (st.notif === 'robot' ? ' · CC untuk Anda' : '');
+    n.setAttribute('aria-label', `Notifikasi email baru dari ${m.from}: ${m.subj}`);
+    requestAnimationFrame(() => n.classList.add('show'));
+  } else n.classList.remove('show');
+  n.inert = !st.notif;
+
+  // Badge
+  ['#tb-mail', '#dk-mail .ico'].forEach(s => {
+    const el = $(s); el.classList.toggle('has-badge', st.badge.mail > 0); $('.badge', el).textContent = st.badge.mail;
+  });
+}
+
+/* Efek tambahan saat scene dimulai. Boleh mengembalikan Promise. */
+const FX = {
+  toastSaved() {
+    const t = $('#erp-toast');
+    t.textContent = '✔ PO berhasil disimpan · Status: Authorized';
+    requestAnimationFrame(() => t.classList.add('on'));
+    setTimeout(() => t.classList.remove('on'), 2600);
+  },
+  async supplierReply(id) {
+    const msgs = $('#msgs');
+    await sleep(800); if (!alive(id)) return;
+    msgs.insertAdjacentHTML('beforeend', '<div class="msg" id="typing-ind"><div class="who">Pak Budi (Supplier)</div><span class="dots"><i></i><i></i><i></i></span></div>');
+    msgs.scrollTop = 1e6;
+    await sleep(1500); if (!alive(id)) return;
+    $('#typing-ind').remove();
+    msgs.insertAdjacentHTML('beforeend', bubble('Pak Budi (Supplier)', '', false, nowHM()));
+    const tx = $('.msg:last-child .tx', msgs);
+    const text = Array.from(`Pagi Bu, email PO ${D.po} sudah kami terima ✅ Barang akan dikirim sesuai jadwal tanggal ${D.tglDatang}. Terima kasih.`);
+    for (let k = 1; k <= text.length; k++) { tx.textContent = text.slice(0, k).join(''); msgs.scrollTop = 1e6; await sleep(16); if (!alive(id)) return; }
+    Sound.pop();
+    await sleep(1000);
+  }
+};
+
+/* =====================================================================
+   5. SUARA (Web Audio API) — aman bila browser tidak mendukung
+   ===================================================================== */
+const Sound = {
+  ctx: null, on: true,
+  unlock() {
+    try {
+      if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) this.ctx = new AC(); }
+      if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    } catch (e) { this.ctx = null; }
+  },
+  tone(f, at, dur, type, vol) {
+    if (!this.on || !this.ctx) return;
+    try {
+      const c = this.ctx, t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+      o.type = type || 'sine'; o.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.2, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
+    } catch (e) { /* abaikan */ }
+  },
+  ding() { this.tone(880, 0, 0.55, 'sine', 0.22); this.tone(1318.5, 0.13, 0.7, 'sine', 0.18); },
+  pop() { this.tone(660, 0, 0.15, 'sine', 0.15); this.tone(990, 0.06, 0.2, 'sine', 0.12); },
+  buzz() { this.tone(196, 0, 0.2, 'triangle', 0.16); },
+  tick() { this.tone(1700, 0, 0.04, 'square', 0.04); },
+  win() { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, i * 0.12, 0.45, 'sine', 0.16)); }
+};
+
+/* =====================================================================
+   6. SCORM 1.2 (opsional) — semua panggilan aman tanpa LMS
+   ===================================================================== */
+const SCORM = (function () {
+  let api = null, live = false;
+  const t0 = Date.now();
+  function find(w) {
+    try {
+      let n = 0;
+      while (w && !w.API && w.parent && w.parent !== w && n < 10) { w = w.parent; n++; }
+      return (w && w.API) || null;
+    } catch (e) { return null; }   // beda domain → anggap tidak ada LMS
+  }
+  const get = k => { try { return live ? String(api.LMSGetValue(k)) : ''; } catch (e) { return ''; } };
+  const set = (k, v) => { try { if (live) api.LMSSetValue(k, String(v)); } catch (e) { /* abaikan */ } };
+  const commit = () => { try { if (live) api.LMSCommit(''); } catch (e) { /* abaikan */ } };
+  const pad = x => String(x).padStart(2, '0');
+  const span = ms => { const s = Math.floor(ms / 1000); return String(Math.floor(s / 3600)).padStart(4, '0') + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60) + '.00'; };
+  return {
+    init() {
+      api = find(window) || (window.opener ? find(window.opener) : null);
+      if (!api) return false;
+      try { live = String(api.LMSInitialize('')) === 'true'; } catch (e) { live = false; }
+      if (live) {
+        const st = get('cmi.core.lesson_status');
+        if (!st || st === 'not attempted') set('cmi.core.lesson_status', 'incomplete');
+        commit();
+      }
+      return live;
+    },
+    report(mode, score, passed) {
+      if (!live) return;
+      if (mode === 'test') {
+        set('cmi.core.score.min', 0); set('cmi.core.score.max', 100); set('cmi.core.score.raw', score);
+        set('cmi.core.lesson_status', passed ? 'passed' : 'failed');
+      } else if (mode === 'try') {
+        const st = get('cmi.core.lesson_status');
+        if (st !== 'passed' && st !== 'failed') set('cmi.core.lesson_status', 'completed');
+      }
+      commit();
+    },
+    finish() {
+      if (!live) return;
+      set('cmi.core.session_time', span(Date.now() - t0)); commit();
+      try { api.LMSFinish(''); } catch (e) { /* abaikan */ }
+      live = false;
+    },
+    get connected() { return live; }
+  };
+})();
+
+/* =====================================================================
+   7. MESIN SIMULASI (state machine)
+   ===================================================================== */
+const S = {
+  mode: null, i: 0, run: 0, active: false, paused: false,
+  wrong: 0, err: [], helped: [], totalErr: 0, t0: 0, tEnd: 0, typed: 0, guide: null
+};
+const CANCEL = { cancel: true };
+const alive = id => id === S.run;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function dsleep(ms, id) {            // sleep untuk demo: mengikuti Jeda & pembatalan
+  let left = ms / CONFIG.kecepatanDemo;
+  while (left > 0) {
+    await sleep(Math.min(100, left));
+    if (!alive(id)) throw CANCEL;
+    if (!S.paused) left -= 100;
+  }
+}
+
+const step = () => STEPS[S.i];
+const inertUp = el => { for (let p = el; p && p !== sim; p = p.parentElement) if (p.inert) return true; return false; };
+// Urutan mengikuti urutan selector di "target" (bukan urutan DOM): yang pertama = target utama
+const targetsOf = st => st.target.split(',').flatMap(sel => $$(sel.trim())).filter(el => el.getClientRects().length && !inertUp(el));
+const primary = st => targetsOf(st)[0] || $(st.target.split(',')[0]);
+
+function relRect(el) {
+  const r = el.getBoundingClientRect(), s = screen.getBoundingClientRect();
+  return { x: r.left - s.left, y: r.top - s.top, w: r.width, h: r.height };
+}
+function ensureVisible(el) {
+  if (!el) return;
+  for (let p = el.parentElement; p && p !== screen; p = p.parentElement) {
+    const cs = getComputedStyle(p);
+    if (!/(auto|scroll)/.test(cs.overflowY + cs.overflowX)) continue;
+    const pr = p.getBoundingClientRect(), r = el.getBoundingClientRect();
+    if (r.bottom > pr.bottom) p.scrollTop += r.bottom - pr.bottom + 16;
+    else if (r.top < pr.top) p.scrollTop -= pr.top - r.top + 16;
+    if (r.right > pr.right) p.scrollLeft += r.right - pr.right + 8;
+    else if (r.left < pr.left) p.scrollLeft -= pr.left - r.left + 8;
+  }
+}
+
+/* --- Highlight + tooltip --- */
+const ring = $('#ring'), tip = $('#tip'), cursor = $('#cursor');
+function showGuide(kind) {
+  const st = step(), el = primary(st);
+  if (!el) return;
+  const hint = kind === 'hint';
+  S.guide = { el, kind };
+  tip.innerHTML = `<span class="st">${hint ? '💡 Petunjuk' : 'Langkah ' + (S.i + 1)}</span>${hint ? st.petunjuk : st.instruksi}`;
+  tip.className = 'tip on' + (hint ? ' hint' : '');
+  ring.className = 'ring on' + (hint ? ' strong' : '');
+  if (hint) say('Petunjuk: ' + strip(st.petunjuk));
+}
+function clearGuide() { S.guide = null; ring.className = 'ring'; tip.className = 'tip'; }
+function placeGuide() {
+  if (S.guide) {
+    const el = S.guide.el, r = relRect(el), sw = screen.clientWidth, sh = screen.clientHeight, pad = 5;
+    Object.assign(ring.style, { left: r.x - pad + 'px', top: r.y - pad + 'px', width: r.w + pad * 2 + 'px', height: r.h + pad * 2 + 'px' });
+    const tw = tip.offsetWidth, th = tip.offsetHeight, gap = 14;
+    let below = r.y + r.h + gap + th < sh - 4 || r.y - gap - th < 4;
+    let top = below ? r.y + r.h + gap : r.y - gap - th;
+    if (top + th > sh - 4) top = Math.max(4, sh - th - 4);
+    const cx = r.x + r.w / 2;
+    const left = Math.max(8, Math.min(sw - tw - 8, cx - tw / 2));
+    tip.style.transform = `translate(${left}px,${top}px)`;
+    tip.style.setProperty('--ax', Math.max(14, Math.min(tw - 14, cx - left)) + 'px');
+    tip.classList.toggle('below', below); tip.classList.toggle('above', !below);
+  }
+  requestAnimationFrame(placeGuide);
+}
+requestAnimationFrame(placeGuide);
+
+/* --- Kursor palsu --- */
+function cursorTo(el) {
+  const r = relRect(el);
+  cursor.classList.add('on');
+  cursor.style.transform = `translate(${r.x + r.w / 2}px,${r.y + r.h / 2}px)`;
+}
+function ripple(x, y) {
+  const d = document.createElement('div');
+  d.className = 'ripple'; d.style.left = x + 'px'; d.style.top = y + 'px';
+  $('.fx').appendChild(d); setTimeout(() => d.remove(), 550);
+}
+function rippleOn(el) { const r = relRect(el); ripple(r.x + r.w / 2, r.y + r.h / 2); }
+async function pointHint(el) {                // mode Coba: kursor menunjukkan letak target
+  const id = S.run;
+  cursor.style.transition = 'none';
+  cursor.style.transform = `translate(${screen.clientWidth / 2}px,${screen.clientHeight / 2}px)`;
+  cursor.classList.add('on');
+  await sleep(30); cursor.style.transition = '';
+  cursorTo(el); await sleep(800);
+  if (!alive(id)) return;
+  cursor.classList.add('wiggle'); await sleep(1100);
+  cursor.classList.remove('wiggle');
+  if (alive(id) && S.mode !== 'demo') cursor.classList.remove('on');
+}
+
+/* --- Umpan balik --- */
+let fbTimer;
+function flash(msg, kind) {
+  const f = $('#feedback');
+  f.textContent = msg; f.className = 'feedback on' + (kind ? ' ' + kind : '');
+  clearTimeout(fbTimer); fbTimer = setTimeout(() => f.classList.remove('on'), 1700);
+  say(msg);
+}
+const strip = h => h.replace(/<[^>]+>/g, '');
+function say(t) { const l = $('#sr-live'); l.textContent = ''; setTimeout(() => { l.textContent = t; }, 30); }
+function shake() { sim.classList.remove('shake'); void sim.offsetWidth; sim.classList.add('shake'); }
+
+/* --- Alur langkah --- */
+async function gotoStep(i) {
+  const id = ++S.run;
+  S.active = false; S.i = i; S.wrong = 0; S.typed = 0;
+  clearGuide();
+  if (S.mode !== 'demo') cursor.classList.remove('on');
+  const st = step(), sc = SCENES[st.scene];
+  if (!sc) { console.error('Scene tidak ditemukan:', st.scene); return; }
+  render(sc);
+  updateHud();
+  if (sc.sound === 'ding') setTimeout(() => alive(id) && Sound.ding(), 280);
+  if (sc.fx && FX[sc.fx]) FX[sc.fx](id);
+  fixFocus();
+  await sleep(430);                       // tunggu animasi jendela selesai
+  if (!alive(id)) return;
+  ensureVisible(primary(st));
+  S.active = true;
+  if (S.mode === 'try') showGuide('normal');
+  if (S.mode === 'demo') runDemo(id);
+}
+function completeStep() {
+  if (!S.active) return;
+  S.active = false;
+  clearGuide();
+  if (S.i < STEPS.length - 1) gotoStep(S.i + 1);
+  else finish();
+}
+function wrong(msg) {
+  S.wrong++; S.err[S.i] = (S.err[S.i] || 0) + 1; S.totalErr++;
+  Sound.buzz(); shake(); updateHud();
+  if (S.mode === 'try') {
+    if (S.wrong >= 2) { flash(msg || 'Belum tepat — lihat petunjuk 💡'); showGuide('hint'); pointHint(S.guide.el); }
+    else flash(msg || 'Coba lagi');
+  } else {
+    flash(msg || 'Belum tepat', 'muted');
+    if (CONFIG.bantuanUjiSetelah && S.wrong >= CONFIG.bantuanUjiSetelah) { S.helped[S.i] = true; showGuide('hint'); }
+  }
+}
+function fixFocus() {                     // keyboard: jangan biarkan fokus "hilang" di elemen tersembunyi
+  const a = document.activeElement;
+  if (!a || !sim.contains(a)) return;
+  if (inertUp(a) || !a.getClientRects().length) {
+    const f = $('.win.front.open') || $('.win.open');
+    if (f) f.focus({ preventScroll: true });
+  }
+}
+
+/* --- Klik di layar: benar / salah --- */
+screen.addEventListener('click', e => {
+  if (e.target.closest('.overlay')) return;
+  if (!S.mode) return;
+  if (S.mode === 'demo') {
+    e.preventDefault(); e.stopPropagation();
+    flash('Mode Demo berjalan otomatis. Pilih "Ganti mode" untuk mencoba sendiri.', 'info');
+    return;
+  }
+  if (!S.active) { e.preventDefault(); e.stopPropagation(); return; }
+  const st = step();
+  const hit = targetsOf(st).find(t => t.contains(e.target));
+  if (hit) {
+    if (st.aksi === 'click') {
+      e.preventDefault(); e.stopPropagation();
+      if (e.detail === 0) rippleOn(hit); else { const s = screen.getBoundingClientRect(); ripple(e.clientX - s.left, e.clientY - s.top); }
+      Sound.tick();
+      completeStep();
+    }
+    return;                               // aksi "type": biarkan fokus ke kolom / tombol submit
+  }
+  e.preventDefault(); e.stopPropagation();
+  wrong();
+}, true);
+
+/* --- Mengetik: "tepat" (validasi saat Enter) --- */
+const norm = s => String(s).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
+$('#url-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const st = step();
+  if (!S.active || S.mode === 'demo' || st.aksi !== 'type' || !$(st.target.split(',')[0]).closest('#url-form')) return;
+  const val = $('#url').value;
+  const ok = [st.teks].concat(st.terima || []).some(t => norm(t) === norm(val));
+  if (ok) { Sound.tick(); completeStep(); }
+  else wrong(val.trim() ? 'Alamat belum tepat — periksa ketikan Anda' : 'Kolom alamat masih kosong');
+});
+/* --- Mengetik: "panduan" (tombol apa saja → 1 kata terisi) --- */
+$('#chat-input').addEventListener('input', e => {
+  const st = step(), el = e.target;
+  if (!S.active || S.mode === 'demo' || st.aksi !== 'type' || st.cocok !== 'panduan' || primary(st) !== el) return;
+  const full = Array.from(st.teks);
+  let n = S.typed;
+  if (e.inputType && e.inputType.indexOf('delete') === 0) n = Math.max(0, n - 1);
+  else { n++; while (n < full.length && full[n - 1] !== ' ') n++; }
+  S.typed = Math.min(n, full.length);
+  el.value = full.slice(0, S.typed).join('');
+  el.scrollTop = el.scrollHeight;
+  if (S.typed >= full.length) { const id = S.run; S.active = false; setTimeout(() => { if (alive(id)) { S.active = true; completeStep(); } }, 350); }
+});
+$('#chat-form').addEventListener('submit', e => e.preventDefault());
+
+/* --- Mode Demo: kursor bergerak & klik sendiri --- */
+async function typewriter(el, text, id) {
+  const ch = Array.from(text), delay = ch.length > 80 ? 22 : 50;
+  el.classList.add('typing');
+  for (let k = 1; k <= ch.length; k++) { el.value = ch.slice(0, k).join(''); el.scrollTop = el.scrollHeight; await dsleep(delay, id); }
+  el.classList.remove('typing');
+}
+async function runDemo(id) {
+  try {
+    const st = step();
+    await dsleep(300, id);
+    showGuide('normal');
+    await dsleep(1300, id);
+    const el = primary(st);
+    ensureVisible(el); await dsleep(200, id);
+    cursorTo(el); await dsleep(850, id);
+    rippleOn(el); Sound.tick(); await dsleep(250, id);
+    if (st.aksi === 'type') {
+      await typewriter(el, st.teks, id);
+      if (st.cocok === 'tepat') { await dsleep(250, id); flash('⏎ Enter', 'info'); await dsleep(500, id); }
+    }
+    completeStep();
+  } catch (err) { if (err !== CANCEL) throw err; }
+}
+
+/* --- Selesai --- */
+async function finish() {
+  const id = ++S.run;
+  S.tEnd = Date.now();
+  updateHud(true);
+  const sc = SCENES[CONFIG.sceneAkhir];
+  if (sc) {
+    render(sc);
+    if (sc.fx && FX[sc.fx]) await FX[sc.fx](id);
+  }
+  if (!alive(id)) return;
+  cursor.classList.remove('on');
+  Sound.win();
+  showEnd();
+}
+const fmtTime = ms => { const s = Math.round(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+function stepScore(i) { return S.helped[i] ? 0 : [1, 0.75, 0.5, 0.25][Math.min(S.err[i] || 0, 3)]; }
+function showEnd() {
+  const n = STEPS.length, sheet = $('#end-sheet');
+  if (S.mode === 'demo') {
+    sheet.innerHTML = `<h2 id="end-title">🎬 Demo selesai!</h2>
+      <p class="lead">Anda sudah melihat ${n} langkah memproses PR AI sampai konfirmasi ke supplier. Sekarang giliran Anda mencoba.</p>
+      <div class="end-btns"><button type="button" class="primary" data-act="try">👆 Coba sendiri</button><button type="button" data-act="test">📝 Langsung Uji</button><button type="button" data-act="again">↺ Ulangi demo</button></div>`;
+  } else {
+    const score = Math.round(STEPS.reduce((s, _, i) => s + stepScore(i), 0) / n * 100);
+    const passed = score >= CONFIG.nilaiLulus, test = S.mode === 'test';
+    const clean = STEPS.filter((_, i) => !(S.err[i] || 0) && !S.helped[i]).length;
+    SCORM.report(S.mode, score, passed);
+    const color = score >= CONFIG.nilaiLulus ? '#16a34a' : score >= 60 ? '#f59e0b' : '#dc2626';
+    sheet.innerHTML = `<h2 id="end-title">${test ? (passed ? '🎉 Selamat, Anda lulus!' : '📘 Belum lulus, ayo coba lagi') : '✅ Latihan selesai!'}</h2>
+      <p class="lead">${test ? `Nilai minimal lulus: ${CONFIG.nilaiLulus}.` : 'Ini nilai latihan (tidak dikirim sebagai nilai tes).'} PR ${D.pr} sudah diproses menjadi PO ${D.po} dan supplier sudah mengonfirmasi.</p>
+      <div class="score"><div class="circle" style="--p:${score};--c:${color}"><span>${score}</span></div>
+        <div class="stats">
+          <div class="stat"><b>${fmtTime(S.tEnd - S.t0)}</b><span>Waktu</span></div>
+          <div class="stat"><b>${S.totalErr}</b><span>Total kesalahan</span></div>
+          <div class="stat"><b>${clean}/${n}</b><span>Langkah tanpa salah</span></div>
+          <div class="stat"><span class="verdict ${test ? (passed ? 'pass' : 'fail') : 'neutral'}">${test ? (passed ? 'LULUS' : 'BELUM LULUS') : 'LATIHAN'}</span></div>
+        </div></div>
+      <ol class="steplist">${STEPS.map((s, i) => `<li>${S.helped[i] ? '🆘' : (S.err[i] ? '⚠️' : '✅')} ${esc(strip(s.tugas))}${S.err[i] ? ` <span class="muted">(${S.err[i]}× salah${S.helped[i] ? ', dibantu' : ''})</span>` : ''}</li>`).join('')}</ol>
+      <p class="note">Cara hitung: tiap langkah bernilai 1 (tanpa salah), 0,75 (1× salah), 0,5 (2×), 0,25 (3× atau lebih), 0 bila dibantu petunjuk.${SCORM.connected ? ' Nilai sudah dikirim ke LMS.' : ''}</p>
+      <div class="end-btns">${test ? '' : '<button type="button" class="primary" data-act="test">📝 Lanjut ke Uji</button>'}<button type="button" ${test ? 'class="primary"' : ''} data-act="again">↺ Ulangi</button><button type="button" data-act="mode">⇄ Ganti mode</button></div>`;
+  }
+  showOverlay('ov-end');
+}
+$('#end-sheet').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.act;
+  if (a === 'again') startMode(S.mode);
+  else if (a === 'mode') openModePicker();
+  else startMode(a);
+});
+
+/* --- Overlay & mode --- */
+function showOverlay(idName) {
+  $$('.overlay').forEach(o => { const on = o.id === idName; o.classList.toggle('on', on); o.inert = !on; });
+  sim.inert = true;
+  setTimeout(() => { const f = $('#' + idName + ' button'); if (f) f.focus(); }, 60);
+}
+function hideOverlays() {
+  $$('.overlay').forEach(o => { o.classList.remove('on'); o.inert = true; });
+  sim.inert = S.mode === 'demo';
+}
+function openModePicker() {
+  ++S.run; S.active = false; clearGuide(); cursor.classList.remove('on');
+  showOverlay('ov-start');
+}
+function startMode(mode) {
+  Sound.unlock();
+  Object.assign(S, { mode, paused: false, err: [], helped: [], totalErr: 0, t0: Date.now(), tEnd: 0 });
+  document.body.dataset.mode = mode;
+  const chip = $('#mode-chip');
+  chip.className = 'chip ' + mode;
+  chip.textContent = { demo: '👀 Mode Lihat', try: '👆 Mode Coba', test: '📝 Mode Uji' }[mode];
+  $('#btn-pause').hidden = mode !== 'demo';
+  setPause(false);
+  cursor.classList.toggle('on', mode === 'demo');
+  if (mode === 'demo') cursor.style.transform = `translate(${screen.clientWidth / 2}px,${screen.clientHeight / 2}px)`;
+  hideOverlays();
+  gotoStep(0);
+}
+$$('.mode-card').forEach(b => b.addEventListener('click', () => startMode(b.dataset.mode)));
+
+/* --- HUD & tombol kontrol --- */
+function updateHud(done) {
+  const n = STEPS.length, st = step();
+  $('#prog-txt').textContent = done ? `Selesai · ${n}/${n} langkah` : `Langkah ${S.i + 1}/${n}`;
+  const pct = done ? 100 : Math.round(S.i / n * 100);
+  $('#bar-fill').style.width = pct + '%';
+  $('#bar').setAttribute('aria-valuenow', pct);
+  $('#task-ico').textContent = done ? '🏁' : { demo: '👀', try: '👆', test: '📝' }[S.mode];
+  $('#task-txt').innerHTML = done ? 'Semua langkah selesai!' : (S.mode === 'test' ? st.tugas : st.instruksi);
+  $('#btn-prev').disabled = done || S.i === 0;
+  $('#btn-restart').disabled = !S.mode;
+  updateStats();
+}
+function updateStats() {
+  let t = '';
+  if (S.mode === 'test') t = `⏱ ${fmtTime((S.tEnd || Date.now()) - S.t0)} · ✗ ${S.totalErr}`;
+  else if (S.mode === 'try') t = `✗ ${S.totalErr} kesalahan`;
+  $('#stats').textContent = t;
+}
+setInterval(updateStats, 1000);
+function setPause(p) {
+  S.paused = p;
+  $('#btn-pause').textContent = p ? '▶ Lanjut' : '⏸ Jeda';
+  $('#btn-pause').setAttribute('aria-pressed', String(p));
+}
+$('#btn-pause').addEventListener('click', () => setPause(!S.paused));
+$('#btn-prev').addEventListener('click', () => { if (S.mode && S.i > 0) { hideOverlays(); gotoStep(S.i - 1); } });
+$('#btn-restart').addEventListener('click', () => { if (S.mode) startMode(S.mode); });
+$('#btn-mode').addEventListener('click', openModePicker);
+$('#btn-sound').addEventListener('click', e => {
+  Sound.on = !Sound.on; Sound.unlock();
+  e.currentTarget.textContent = Sound.on ? '🔊' : '🔇';
+  e.currentTarget.setAttribute('aria-pressed', String(Sound.on));
+  e.currentTarget.setAttribute('aria-label', 'Suara: ' + (Sound.on ? 'aktif' : 'mati'));
+});
+
+/* Cadangan untuk browser lama tanpa overflow:clip: layar tidak boleh ikut bergeser */
+[screen, sim].forEach(el => el.addEventListener('scroll', () => { el.scrollTop = 0; el.scrollLeft = 0; }));
+
+/* --- Jam taskbar --- */
+function tickClock() {
+  const d = new Date();
+  $('#clk-t').textContent = nowHM();
+  $('#clk-d').textContent = d.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+setInterval(tickClock, 15000);
+
+/* =====================================================================
+   8. INISIALISASI
+   ===================================================================== */
+$$('[data-ico]').forEach(el => { el.innerHTML = ICONS[el.dataset.ico] || ''; });
+buildMail(); buildERP(); buildChat();
+render(SCENES.idle);
+tickClock();
+$('#prog-txt').textContent = `Langkah 0/${STEPS.length}`;
+sim.inert = true;
+const lms = SCORM.init();
+$('#lms-status').textContent = lms ? 'LMS: terhubung (SCORM 1.2)' : 'LMS: tidak terhubung — berjalan mandiri';
+window.addEventListener('pagehide', () => SCORM.finish());
+window.addEventListener('beforeunload', () => SCORM.finish());
+STEPS.forEach(s => { if (!SCENES[s.scene]) console.warn('Langkah "' + s.id + '" memakai scene yang belum ada:', s.scene); });
+})();
+</script>
+</body>
+</html>
