@@ -36,8 +36,8 @@ Nilai akhir adalah rata-ratanya × 100. Batas lulus default 80.
       "perubahan harga/barang kosong segera diinfokan"). Soal wewenang persetujuan harga dan siapa yang
       mencari supplier pengganti, PDF tidak menjelaskannya.
 - [ ] **Data fiktif diganti dengan data asli bila perlu** (lihat `CONFIG.data` di bawah).
-- [ ] **Paket ZIP sudah dicoba di LMS sungguhan** dengan 1 akun tes. Selama pengembangan,
-      paket ini baru diuji dengan LMS tiruan.
+- [ ] **Paket ZIP sudah dicoba di LMS produksi** dengan 1 akun tes. Selama pengembangan, paket ini
+      diuji dengan runtime SCORM open-source (lihat Hasil pengujian), bukan LMS perusahaan.
 - [ ] **Aturan lulus di LMS sudah diputuskan** (lihat `wajibSemuaSkenario`).
 
 ## Mengunggah ke LMS (SCORM 1.2)
@@ -120,7 +120,19 @@ atau target keputusan yang salah, peringatannya muncul di sana.
 - Responsif sampai lebar HP (diuji di 390 px). Menghormati pengaturan "kurangi animasi" (`prefers-reduced-motion`).
 - Suara (Web Audio) bisa dimatikan dengan tombol 🔊.
 
+## Hasil pengujian (6 Okt 2026, Chromium)
+
+| Pengujian | Cakupan | Hasil |
+|---|---|---|
+| Alur lengkap | 3 skenario × mode Lihat/Coba/Uji, layar desktop 1280 px & HP 390 px, termasuk sengaja salah klik, salah ketik, dan salah pilih | Semua selesai, tanpa error JavaScript |
+| Kasus pinggiran | 18 kasus: keyboard saja, Kembali/Ulangi/Ganti mode di tengah animasi, Jeda demo, resize layar | 18/18 lolos |
+| Runtime SCORM 1.2 | [scorm-again](https://github.com/jcputney/scorm-again) 3.4.5 (validasi format data seperti LMS): peserta baru lulus/gagal, sesi kedua (data dipulihkan), status lulus tidak turun, mode Coba, `wajibSemuaSkenario` 1/3 → 2/3 → 3/3 | 9/9 lolos, 0 error code SCORM |
+| Aksesibilitas | axe-core di setiap layar ketiga skenario, desktop & HP (88 kondisi layar) | 0 pelanggaran |
+
+Belum diuji: Firefox/Safari, perangkat HP fisik, LMS produksi, dan validasi manifest terhadap file skema XSD resmi.
+
 ## Keterbatasan yang diketahui
+- Klik di area kosong (misalnya saat membaca email) dihitung sebagai kesalahan di mode Uji, sesuai spesifikasi "klik di area salah". Ini bisa terasa ketat bagi peserta yang suka mengklik sambil membaca. Pantau saat uji coba.
 - Bagian yang belum ada di PDF tidak disimulasikan: login ERP, penerimaan barang, dan pencocokan invoice.
 - Di HP, panduan mengetik 1 kata per ketukan bergantung pada keyboard virtual. Sudah diuji di Chromium, belum di perangkat fisik.
 - Paket SCORM tidak menyertakan file skema XSD. Moodle umumnya tidak memerlukannya, tapi validator yang ketat bisa memberi peringatan.

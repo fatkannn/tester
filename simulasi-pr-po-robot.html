@@ -25,7 +25,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0}
-body{background:#0b1220 radial-gradient(1200px 600px at 20% -10%,#1e3a8a55,transparent),#0b1220;color:#e2e8f0;min-height:100vh;line-height:1.4}
+body{background:radial-gradient(1200px 600px at 20% -10%,#1e3a8a55,transparent),#0b1220;color:#e2e8f0;min-height:100vh;line-height:1.4}
 button{font:inherit;color:inherit;cursor:pointer}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -325,7 +325,7 @@ table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
 .decision.open .dec-card{transform:none}
 .dec-card:focus{outline:none}
 .dec-tag{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#7c2d12;background:#ffedd5;border-radius:6px;padding:2px 8px}
-.dec-card h3{margin:8px 0;font-size:16.5px}
+.dec-card h2{margin:8px 0;font-size:16.5px}
 .dec-quote{border-left:4px solid var(--chat);background:#f5f3ff;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px}
 .dec-quote b{display:block;font-size:11.5px;color:#6d28d9}
 .opts{display:grid;gap:8px}
@@ -351,16 +351,31 @@ table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
 .cell-in{width:86px;border:1px solid #cbd5e1;border-radius:6px;padding:4px 6px;text-align:right;font:inherit;font-size:12.5px;background:#fff;color:var(--ink)}
 .cell-in:focus{outline:2px solid var(--brand)}
 .cell-in.changed{background:#fef9c3;border-color:#eab308;font-weight:700}
-tr.nol td.nm{text-decoration:line-through;color:#94a3b8}
+tr.nol td.nm{text-decoration:line-through;color:#64748b}
 .btn.blue{background:var(--brand);color:#fff}
 
 /* ---------- Responsif ---------- */
 @media (max-width:760px){
-  .app{padding:12px}
-  .hud{grid-template-columns:1fr}
-  .brand h1{font-size:16px}
+  .app{padding:10px 12px}
+  .topbar{gap:8px}
+  .hud{grid-template-columns:1fr;gap:8px;margin:8px 0}
+  .brand .logo{width:32px;height:32px}
+  .brand h1{font-size:15px}
+  .brand p{display:none}
+  .controls{gap:6px}
+  .ctl{min-width:40px;padding:6px 10px}
+  .ctl .t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}   /* ikon saja; label tetap dibaca pembaca layar */
+  .taskbox{padding:8px 12px;min-height:0}
+  .taskbox p{font-size:14px}
+  .sheet{padding:16px}
+  .sheet h2{font-size:18px}
+  .mode-card{display:grid;grid-template-columns:34px 1fr;column-gap:8px;padding:10px 12px}
+  .mode-card .mi{grid-row:span 2;font-size:24px}
+  .mode-card b{margin:0;font-size:15px}
+  .mode-card span{font-size:12.5px}
+  .learn{display:none}
   .monitor{padding:4px;border-radius:12px}
-  .screen{height:max(560px,calc(100vh - 250px))}
+  .screen{height:max(560px,calc(100vh - 215px));height:max(560px,calc(100dvh - 215px))}
   .win{left:0;right:0;top:0;bottom:var(--tb);border-radius:0}
   .tb-search,.clock .d,.tray .tic{display:none}
   .desk{grid-template-columns:repeat(3,auto)}
@@ -414,23 +429,23 @@ tr.nol td.nm{text-decoration:line-through;color:#94a3b8}
     </div>
     <div class="controls">
       <span class="chip" id="mode-chip">Belum mulai</span>
-      <button class="ctl" id="btn-pause" type="button" hidden>⏸ Jeda</button>
-      <button class="ctl" id="btn-prev" type="button" disabled>← Langkah sebelumnya</button>
-      <button class="ctl" id="btn-restart" type="button" disabled>↺ Ulangi</button>
-      <button class="ctl" id="btn-mode" type="button">⇄ Ganti mode</button>
+      <button class="ctl" id="btn-pause" type="button" hidden>⏸<span class="t"> Jeda</span></button>
+      <button class="ctl" id="btn-prev" type="button" disabled>←<span class="t"> Langkah sebelumnya</span></button>
+      <button class="ctl" id="btn-restart" type="button" disabled>↺<span class="t"> Ulangi</span></button>
+      <button class="ctl" id="btn-mode" type="button">⇄<span class="t"> Ganti mode</span></button>
       <button class="ctl" id="btn-sound" type="button" aria-pressed="true" aria-label="Suara: aktif">🔊</button>
     </div>
   </header>
 
-  <div class="hud">
+  <section class="hud" aria-label="Kemajuan dan tugas">
     <div>
       <div class="prog-lbl"><span id="prog-txt">Langkah 0/0</span><span id="stats"></span></div>
       <div class="bar" id="bar" role="progressbar" aria-label="Kemajuan simulasi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="bar-fill"></span></div>
     </div>
     <div class="taskbox"><span class="ti" id="task-ico" aria-hidden="true">🎯</span><p id="task-txt" aria-live="polite">Pilih mode untuk memulai simulasi.</p></div>
-  </div>
+  </section>
 
-  <div class="monitor">
+  <main class="monitor" aria-label="Layar simulasi">
     <div class="screen" id="screen">
       <!-- ================= DESKTOP PALSU ================= -->
       <div class="sim" id="sim">
@@ -481,7 +496,7 @@ tr.nol td.nm{text-decoration:line-through;color:#94a3b8}
             <div class="erp" id="erp" hidden></div>
             <div class="pdf-modal" id="pdf-modal" role="dialog" aria-label="Pratinjau PDF" inert>
               <div class="pdf-bar"><span id="pdf-title">dokumen.pdf</span><span class="sp"></span><button class="pdf-dl" type="button">⬇ Unduh</button><button id="pdf-close" type="button">✕ Tutup</button></div>
-              <div class="pdf-scroll"><div class="paper" id="pdf-paper"></div></div>
+              <div class="pdf-scroll" tabindex="0" aria-label="Isi dokumen PDF"><div class="paper" id="pdf-paper"></div></div>
             </div>
           </div>
         </section>
@@ -496,7 +511,7 @@ tr.nol td.nm{text-decoration:line-through;color:#94a3b8}
               <div class="empty" id="room-empty">Pilih chat di sebelah kiri untuk mulai mengobrol.</div>
               <div class="room" id="room" hidden>
                 <div class="room-head"><button class="room-back" type="button" aria-label="Kembali ke daftar chat">←</button><span class="av" id="room-av"></span><div><b id="room-name"></b><small id="room-sub"></small></div></div>
-                <div class="msgs" id="msgs" aria-live="polite"></div>
+                <div class="msgs" id="msgs" aria-live="polite" tabindex="0" aria-label="Isi percakapan"></div>
                 <form class="chat-form" id="chat-form">
                   <label class="sr" for="chat-input">Tulis pesan</label>
                   <textarea id="chat-input" rows="2" placeholder="Tulis pesan…"></textarea>
@@ -511,7 +526,7 @@ tr.nol td.nm{text-decoration:line-through;color:#94a3b8}
         <div class="decision" id="decision" role="dialog" aria-modal="true" aria-labelledby="dec-q" inert>
           <div class="dec-card" tabindex="-1">
             <span class="dec-tag">🤔 Keputusan</span>
-            <h3 id="dec-q"></h3>
+            <h2 id="dec-q"></h2>
             <div class="dec-quote" id="dec-quote"></div>
             <div class="opts" id="dec-opts"></div>
             <div class="dec-fb" id="dec-fb" role="status" hidden></div>
@@ -529,10 +544,10 @@ tr.nol td.nm{text-decoration:line-through;color:#94a3b8}
         <div class="taskbar" role="toolbar" aria-label="Taskbar">
           <button class="tb-start" id="tb-start" type="button" aria-label="Menu mulai"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#38bdf8"/><path d="M8 12l3 3 5-6" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></button>
           <div class="tb-search" aria-hidden="true">🔍 Cari</div>
-          <button class="tb-app" id="tb-mail" type="button" aria-label="SurelKu (email)"><span class="app-sq i-mail" data-ico="mail"></span><span class="badge" aria-hidden="true"></span></button>
-          <button class="tb-app" id="tb-browser" type="button" aria-label="Jelajah (browser)"><span class="app-sq i-web" data-ico="web"></span></button>
-          <button class="tb-app" id="tb-chat" type="button" aria-label="KabarIn (chat)"><span class="app-sq i-chat" data-ico="chat"></span></button>
-          <button class="tb-app" id="tb-files" type="button" aria-label="Dokumen"><span class="app-sq i-files" data-ico="files"></span></button>
+          <button class="tb-app" id="tb-mail" type="button"><span class="sr">SurelKu (email)</span><span class="app-sq i-mail" data-ico="mail"></span><span class="badge" aria-hidden="true"></span></button>
+          <button class="tb-app" id="tb-browser" type="button"><span class="sr">Jelajah (browser)</span><span class="app-sq i-web" data-ico="web"></span></button>
+          <button class="tb-app" id="tb-chat" type="button"><span class="sr">KabarIn (chat)</span><span class="app-sq i-chat" data-ico="chat"></span></button>
+          <button class="tb-app" id="tb-files" type="button"><span class="sr">Dokumen</span><span class="app-sq i-files" data-ico="files"></span></button>
           <div class="tray"><span class="tic" aria-hidden="true">📶 🔈</span><div class="clock" aria-label="Jam"><span id="clk-t">--:--</span><span class="d" id="clk-d"></span></div></div>
         </div>
       </div>
@@ -570,9 +585,9 @@ tr.nol td.nm{text-decoration:line-through;color:#94a3b8}
         <div class="sheet" id="end-sheet"></div>
       </div>
     </div>
-  </div>
+  </main>
 
-  <div class="foot"><span id="lms-status">LMS: memeriksa…</span><span>Tips: jika bingung di mode Coba, klik di mana saja — setelah 2× salah, petunjuk lebih jelas akan muncul.</span></div>
+  <footer class="foot"><span id="lms-status">LMS: memeriksa…</span><span>Tips: jika bingung di mode Coba, klik di mana saja — setelah 2× salah, petunjuk lebih jelas akan muncul.</span></footer>
 </div>
 
 
@@ -1071,7 +1086,7 @@ function buildERP() {
       ${side('nav-stock', '🏬', 'Inventori')}
       ${side('nav-rep', '📊', 'Laporan')}
     </nav>
-    <main class="erp-content" id="erp-content">
+    <div class="erp-content" id="erp-content">
       <div class="erp-toast" id="erp-toast" role="status"></div>
 
       <section class="page" data-page="pr">
@@ -1114,7 +1129,7 @@ function buildERP() {
           <span class="btns"><button type="button" class="btn ghost" id="po-cancel">Batal</button><button type="button" class="btn green" id="po-save">💾 Simpan</button><button type="button" class="btn red" id="po-pdf" hidden>📄 Cetak PDF</button><button type="button" class="btn blue" id="po-resend" hidden>📧 Kirim ulang PO</button></span>
         </div>
       </section>
-    </main>
+    </div>
   </div>`;
 }
 function paperPR() {
@@ -1240,7 +1255,6 @@ function render(st) {
     $('.n-from', n).textContent = m.from;
     $('.n-subj', n).textContent = m.subj;
     $('.n-app', n).textContent = 'SurelKu · baru saja' + (st.notif === 'robot' ? ' · CC untuk Anda' : '');
-    n.setAttribute('aria-label', `Notifikasi email baru dari ${m.from}: ${m.subj}`);
     requestAnimationFrame(() => n.classList.add('show'));
   } else n.classList.remove('show');
   n.inert = !st.notif;
@@ -1347,9 +1361,12 @@ const SCORM = (function () {
         set('cmi.suspend_data', JSON.stringify({ best }));
         if (CONFIG.wajibSemuaSkenario) {
           const ids = SCENARIOS.map(s => s.id);
-          const min = Math.min.apply(null, ids.map(i => (i in best ? best[i] : 0)));
-          score(min);
-          set('cmi.core.lesson_status', ids.some(i => !(i in best)) ? 'incomplete' : (min >= CONFIG.nilaiLulus ? 'passed' : 'failed'));
+          if (ids.some(i => !(i in best))) set('cmi.core.lesson_status', 'incomplete');   // skor baru dikirim setelah semua diuji
+          else {
+            const min = Math.min.apply(null, ids.map(i => best[i]));
+            score(min);
+            set('cmi.core.lesson_status', min >= CONFIG.nilaiLulus ? 'passed' : 'failed');
+          }
         } else if (!(get('cmi.core.lesson_status') === 'passed' && !passed)) {   // status lulus tidak diturunkan
           score(sc);
           set('cmi.core.lesson_status', passed ? 'passed' : 'failed');
@@ -1715,7 +1732,7 @@ function showEnd() {
           <div class="stat"><b>${clean}/${n}</b><span>Langkah tanpa salah</span></div>
           <div class="stat"><span class="verdict ${test ? (passed ? 'pass' : 'fail') : 'neutral'}">${test ? (passed ? 'LULUS' : 'BELUM LULUS') : 'LATIHAN'}</span></div>
         </div></div>
-      <ol class="steplist">${STEPS.map((s, i) => `<li>${S.helped[i] ? '🆘' : (S.err[i] ? '⚠️' : '✅')} ${esc(strip(s.tugas))}${S.err[i] ? ` <span class="muted">(${S.err[i]}× salah${S.helped[i] ? ', dibantu' : ''})</span>` : ''}</li>`).join('')}</ol>
+      <ol class="steplist" tabindex="0" aria-label="Rincian per langkah">${STEPS.map((s, i) => `<li>${S.helped[i] ? '🆘' : (S.err[i] ? '⚠️' : '✅')} ${esc(strip(s.tugas))}${S.err[i] ? ` <span class="muted">(${S.err[i]}× salah${S.helped[i] ? ', dibantu' : ''})</span>` : ''}</li>`).join('')}</ol>
       <p class="note">Cara hitung: tiap langkah bernilai 1 (tanpa salah), 0,75 (1× salah), 0,5 (2×), 0,25 (3× atau lebih), 0 bila dibantu petunjuk.
         ${doneTests.length ? `Skenario yang sudah diuji: ${doneTests.join(', ')} — ${doneTests.length}/${SCENARIOS.length}.` : ''}
         ${SCORM.connected ? (CONFIG.wajibSemuaSkenario ? ' Status LMS: lulus bila semua skenario sudah diuji dan semuanya ≥ nilai lulus.' : ' Nilai sudah dikirim ke LMS.') : ''}</p>
@@ -1797,7 +1814,7 @@ function updateStats() {
 setInterval(updateStats, 1000);
 function setPause(p) {
   S.paused = p;
-  $('#btn-pause').textContent = p ? '▶ Lanjut' : '⏸ Jeda';
+  $('#btn-pause').innerHTML = p ? '▶<span class="t"> Lanjut</span>' : '⏸<span class="t"> Jeda</span>';
   $('#btn-pause').setAttribute('aria-pressed', String(p));
 }
 $('#btn-pause').addEventListener('click', () => setPause(!S.paused));
