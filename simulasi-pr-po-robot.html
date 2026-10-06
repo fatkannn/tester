@@ -1075,6 +1075,7 @@ const SCORM = (function () {
       try { api.LMSFinish(''); } catch (e) { /* abaikan */ }
       live = false;
     },
+    get,
     get connected() { return live; }
   };
 })();
@@ -1451,7 +1452,11 @@ tickClock();
 $('#prog-txt').textContent = `Langkah 0/${STEPS.length}`;
 sim.inert = true;
 const lms = SCORM.init();
-$('#lms-status').textContent = lms ? 'LMS: terhubung (SCORM 1.2)' : 'LMS: tidak terhubung — berjalan mandiri';
+if (lms) {   // batas lulus dari LMS (adlcp:masteryscore) diutamakan agar nilai di layar = status di LMS
+  const ms = parseFloat(SCORM.get('cmi.student_data.mastery_score'));
+  if (ms >= 0 && ms <= 100) CONFIG.nilaiLulus = ms;
+}
+$('#lms-status').textContent = lms ? `LMS: terhubung (SCORM 1.2) · batas lulus ${CONFIG.nilaiLulus}` : 'LMS: tidak terhubung — berjalan mandiri';
 window.addEventListener('pagehide', () => SCORM.finish());
 window.addEventListener('beforeunload', () => SCORM.finish());
 STEPS.forEach(s => { if (!SCENES[s.scene]) console.warn('Langkah "' + s.id + '" memakai scene yang belum ada:', s.scene); });
