@@ -1181,7 +1181,9 @@ function setWin(name, open, front) {
   w.classList.toggle('open', open); w.classList.toggle('front', !!front); w.inert = !open;
   if (tb) { tb.classList.toggle('running', open); tb.classList.toggle('front', !!front); }
 }
+let decInerted = [];                      // elemen yang dinonaktifkan selama dialog keputusan terbuka
 function render(st) {
+  decInerted.forEach(el => { el.inert = false; }); decInerted = [];
   // Jendela
   setWin('mail', st.mail.open, st.front === 'mail');
   setWin('browser', st.browser.open, st.front === 'browser');
@@ -1527,6 +1529,9 @@ async function gotoStep(i) {
     buildDecision(st);
     await sleep(900); if (!alive(id)) return;
     const d = $('#decision'); d.classList.add('open'); d.inert = false;
+    // fokus keyboard & pembaca layar hanya di dalam dialog (jendela di belakangnya nonaktif sementara)
+    decInerted = $$('#sim > *').filter(el => el !== d && !el.inert);
+    decInerted.forEach(el => { el.inert = true; });
     if (S.mode !== 'demo') $('.dec-card').focus({ preventScroll: true });
     await sleep(320); if (!alive(id)) return;
   }
