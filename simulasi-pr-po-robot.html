@@ -11,7 +11,7 @@
 
   CARA MENGUBAH CEPAT
   - Data (nomor PR/PO, supplier, URL, pesan chat) : objek CONFIG.data di <script>.
-  - Daftar langkah                               : <script id="steps-data"> (JSON).
+  - Skenario & daftar langkah                    : <script id="steps-data"> (JSON).
   - Kondisi layar tiap langkah                   : objek SCENES di <script>.
 -->
 <style>
@@ -318,6 +318,42 @@ table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
 .end-btns button.primary{background:var(--brand);color:#fff}
 .note{font-size:12px;color:var(--muted);margin-top:8px}
 
+/* ---------- Dialog keputusan (skenario bercabang) ---------- */
+.decision{position:absolute;left:0;right:0;top:0;bottom:var(--tb);z-index:45;background:#0f172aa6;display:flex;padding:14px;overflow:auto;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s}
+.decision.open{opacity:1;visibility:visible;transition:opacity .3s}
+.dec-card{margin:auto;background:#fff;color:var(--ink);border-radius:16px;width:100%;max-width:600px;padding:18px;box-shadow:0 24px 60px #0009;transform:translateY(12px) scale(.97);transition:transform .3s}
+.decision.open .dec-card{transform:none}
+.dec-card:focus{outline:none}
+.dec-tag{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#7c2d12;background:#ffedd5;border-radius:6px;padding:2px 8px}
+.dec-card h3{margin:8px 0;font-size:16.5px}
+.dec-quote{border-left:4px solid var(--chat);background:#f5f3ff;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px}
+.dec-quote b{display:block;font-size:11.5px;color:#6d28d9}
+.opts{display:grid;gap:8px}
+.opt{display:flex;gap:10px;align-items:flex-start;text-align:left;border:2px solid var(--line);background:#fff;border-radius:11px;padding:10px 12px;font-size:13.5px;transition:border-color .2s,background .2s}
+.opt:hover{border-color:#93c5fd;background:#f8fafc}
+.opt .k{flex:none;width:24px;height:24px;border-radius:50%;background:#e2e8f0;display:grid;place-items:center;font-weight:800;font-size:12px}
+.opt.tried{border-color:#fecaca;background:#fef2f2;color:#7f1d1d;cursor:default}
+.opt.tried .k{background:#fecaca}
+.opt.right{border-color:#86efac;background:#f0fdf4}
+.opt.right .k{background:#16a34a;color:#fff}
+.dec-fb{margin-top:10px;border-radius:10px;padding:10px 12px;font-size:13.5px}
+.dec-fb.bad{background:#fef2f2;color:#7f1d1d;border:1px solid #fecaca}
+.dec-fb.good{background:#f0fdf4;color:#14532d;border:1px solid #bbf7d0}
+.dec-fb b{display:block;margin-bottom:2px}
+#dec-next{margin-top:10px;border:0;border-radius:10px;padding:10px 18px;font-weight:700;background:var(--brand);color:#fff}
+/* Pilihan skenario di layar mulai */
+.lbl-sm{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.scn{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 4px}
+.scn button{border:2px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font-size:13.5px;font-weight:600}
+.scn button[aria-pressed="true"]{border-color:var(--brand);background:#eff6ff;color:#1d4ed8}
+.scn-desc{font-size:13px;color:var(--muted);margin:2px 0 14px}
+/* Kolom isian di tabel PO */
+.cell-in{width:86px;border:1px solid #cbd5e1;border-radius:6px;padding:4px 6px;text-align:right;font:inherit;font-size:12.5px;background:#fff;color:var(--ink)}
+.cell-in:focus{outline:2px solid var(--brand)}
+.cell-in.changed{background:#fef9c3;border-color:#eab308;font-weight:700}
+tr.nol td.nm{text-decoration:line-through;color:#94a3b8}
+.btn.blue{background:var(--brand);color:#fff}
+
 /* ---------- Responsif ---------- */
 @media (max-width:760px){
   .app{padding:12px}
@@ -356,6 +392,8 @@ table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
   .chat.inroom .chat-room{display:flex}
   .room-back{display:block}
   .modes{grid-template-columns:1fr}
+  .cell-in{width:62px}
+  .dec-card{padding:14px}
   .learn ol{columns:1}
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -469,6 +507,18 @@ table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
           </div>
         </section>
 
+        <!-- Dialog keputusan untuk langkah "pilih" (diisi dari data langkah) -->
+        <div class="decision" id="decision" role="dialog" aria-modal="true" aria-labelledby="dec-q" inert>
+          <div class="dec-card" tabindex="-1">
+            <span class="dec-tag">🤔 Keputusan</span>
+            <h3 id="dec-q"></h3>
+            <div class="dec-quote" id="dec-quote"></div>
+            <div class="opts" id="dec-opts"></div>
+            <div class="dec-fb" id="dec-fb" role="status" hidden></div>
+            <button type="button" id="dec-next" data-free hidden>Lanjut →</button>
+          </div>
+        </div>
+
         <!-- Notifikasi (slide-in kanan bawah) -->
         <button class="notif" id="notif" type="button" inert>
           <span class="n-ico i-mail" data-ico="mail"></span>
@@ -500,23 +550,17 @@ table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
       <div class="overlay on" id="ov-start" role="dialog" aria-modal="true" aria-labelledby="start-title">
         <div class="sheet">
           <h2 id="start-title">Memproses PR AI → PO Robot</h2>
-          <p class="lead">Anda berperan sebagai staf Purchasing. Ikuti alurnya dari email PR masuk sampai konfirmasi ke supplier. Pilih cara belajar:</p>
+          <p class="lead">Anda berperan sebagai staf Purchasing di NusaERP (aplikasi fiktif).</p>
+          <p class="lbl-sm">1. Pilih skenario</p>
+          <div class="scn" id="scn-list" role="group" aria-label="Pilih skenario"></div>
+          <p class="scn-desc" id="scn-desc"></p>
+          <p class="lbl-sm">2. Pilih cara belajar</p>
           <div class="modes">
             <button class="mode-card" type="button" data-mode="demo"><span class="mi" aria-hidden="true">👀</span><b>Lihat (Demo)</b><span>Simulasi berjalan sendiri. Kursor bergerak &amp; mengklik otomatis. Cocok untuk pertama kali.</span></button>
             <button class="mode-card" type="button" data-mode="try"><span class="mi" aria-hidden="true">👆</span><b>Coba (Latihan)</b><span>Anda klik sendiri. Bagian yang benar diberi tanda berkedip &amp; petunjuk.</span></button>
             <button class="mode-card" type="button" data-mode="test"><span class="mi" aria-hidden="true">📝</span><b>Uji (Tes)</b><span>Tanpa tanda &amp; petunjuk. Kesalahan dan waktu dihitung untuk nilai.</span></button>
           </div>
-          <div class="learn"><b>Yang akan Anda pelajari:</b>
-            <ol>
-              <li>Membuka email PR dari Intranet Notification</li>
-              <li>Masuk ke NusaERP lewat browser</li>
-              <li>Memeriksa PDF Purchase Request</li>
-              <li>Membuka PO yang dibuat Robot</li>
-              <li>Cek, approve &amp; simpan PO</li>
-              <li>Mengecek email PO dari Robot</li>
-              <li>Konfirmasi ke supplier lewat grup chat</li>
-            </ol>
-          </div>
+          <div class="learn"><b>Yang akan Anda pelajari:</b><ol id="learn-list"></ol></div>
           <p class="note">Keyboard: <b>Tab</b> untuk pindah, <b>Enter</b> untuk klik.</p>
         </div>
       </div>
@@ -531,26 +575,42 @@ table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
   <div class="foot"><span id="lms-status">LMS: memeriksa…</span><span>Tips: jika bingung di mode Coba, klik di mana saja — setelah 2× salah, petunjuk lebih jelas akan muncul.</span></div>
 </div>
 
+
 <!--
   =====================================================================
-  DATA LANGKAH (JSON). Satu objek = satu langkah. Urutan array = urutan alur.
+  DATA SKENARIO & LANGKAH (JSON)
+  { "skenario": [ { id, judul, deskripsi, pelajari[], ringkasan, sceneAkhir, langkah[] } ] }
+
+  Satu objek di "langkah" = satu langkah. Urutan array = urutan alur.
+  Semua langkah:
   - id        : nama unik langkah
   - scene     : kondisi layar SEBELUM langkah ini dikerjakan (kunci di SCENES)
-  - aksi      : "click" atau "type"
+  - aksi      : "click" | "type" | "pilih"
   - target    : selector CSS elemen yang benar (boleh beberapa, dipisah koma;
-                yang pertama dipakai untuk highlight/kursor demo)
+                yang PERTAMA dipakai untuk highlight & kursor demo)
   - instruksi : tooltip di mode Lihat & Coba
   - tugas     : kalimat tugas di mode Uji (tanpa menyebut letak tombol)
-  - petunjuk  : petunjuk jelas setelah 2× salah
-  - teks      : (khusus "type") teks yang harus diketik
-  - cocok     : (khusus "type") "tepat" = harus sama persis lalu Enter,
-                "panduan" = ketik tombol apa saja, teks terisi otomatis
-  - terima    : (opsional) daftar jawaban lain yang juga dianggap benar
-  {nama} akan diganti dengan nilai dari CONFIG.data
+  - petunjuk  : petunjuk jelas setelah 2x salah
+  Khusus "type":
+  - teks      : teks yang harus diketik
+  - cocok     : "tepat" = harus sama lalu Enter | "panduan" = tombol apa saja, teks terisi otomatis
+  - format    : (opsional) "angka" = dibandingkan sebagai angka (30000 = 30.000 = Rp 30.000)
+  - terima    : (opsional) daftar jawaban lain yang juga benar
+  Khusus "pilih" (dialog keputusan / percabangan):
+  - pertanyaan, kutipan (opsional, mis. isi pesan supplier), kutipanDari (opsional)
+  - opsi      : [{ "kunci":"a", "teks":"...", "akibat":"..." }]  -> akibat tampil bila dipilih (salah)
+  - target    : "#opt-<kunci>" milik opsi yang BENAR
+  - penjelasan: tampil setelah memilih yang benar (tombol "Lanjut")
+  {nama} diganti nilai dari CONFIG.data
   =====================================================================
 -->
 <script type="application/json" id="steps-data">
-[
+{"skenario":[
+{"id":"normal","judul":"Alur normal","sceneAkhir":"chat-done",
+ "deskripsi":"Dari email PR masuk sampai supplier mengonfirmasi PO. Ikuti ini lebih dulu.",
+ "pelajari":["Membuka email PR dari Intranet Notification","Masuk ke NusaERP lewat browser","Memeriksa PDF Purchase Request","Membuka PO yang dibuat Robot","Cek, approve & simpan PO","Mengecek email PO dari Robot","Konfirmasi ke supplier lewat grup chat"],
+ "ringkasan":"PR {pr} sudah diproses menjadi PO {po} dan supplier sudah mengonfirmasi.",
+ "langkah":[
   {"id":"notif-email","scene":"notif-pr","aksi":"click","target":"#notif, #tb-mail, #dk-mail",
    "instruksi":"Ada email PR baru masuk. Klik notifikasi di pojok kanan bawah.",
    "tugas":"Buka email Purchase Request yang baru masuk.",
@@ -619,7 +679,123 @@ table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
    "instruksi":"Klik tombol Kirim.",
    "tugas":"Kirim pesan ke grup supplier.",
    "petunjuk":"Tombol bulat ungu dengan tanda panah ➤ di kanan kolom pesan."}
-]
+ ]},
+
+{"id":"harga","judul":"Kasus: harga naik","sceneAkhir":"h-done",
+ "deskripsi":"PO sudah terkirim. Saat dikonfirmasi, supplier membalas bahwa harga salah satu barang naik.",
+ "pelajari":["Menilai balasan supplier tentang kenaikan harga","Memilih tindakan sesuai aturan: invoice harus sama dengan PO","Merevisi harga di PO & approve ulang","Mengirim ulang PO revisi ke supplier"],
+ "ringkasan":"Harga {barangHarga} di PO {po} sudah direvisi menjadi Rp{hargaBaruF} dan PO revisi diterima supplier.",
+ "langkah":[
+  {"id":"h-putuskan","scene":"h-start","aksi":"pilih","target":"#opt-c",
+   "instruksi":"Baca balasan supplier, lalu pilih tindakan yang paling tepat.",
+   "tugas":"Tentukan tindakan atas kenaikan harga dari supplier.",
+   "petunjuk":"Ingat isi email Robot: invoice harus sesuai harga di PO. Jadi harga di PO yang perlu disesuaikan — lewat sistem, bukan hanya lewat chat.",
+   "pertanyaan":"Supplier menginfokan harga {barangHarga} naik. Apa yang Anda lakukan?",
+   "kutipanDari":"Pak Budi ({supplierPendek})","kutipan":"{balasHarga}",
+   "opsi":[
+    {"kunci":"a","teks":"Biarkan saja. Nanti harga di invoice menyesuaikan sendiri.",
+     "akibat":"Invoice (Rp{hargaBaruF}) jadi tidak sama dengan PO (Rp{hargaLamaF}). Tagihan bisa tertahan saat pencocokan dan pembayaran ke supplier tertunda."},
+    {"kunci":"b","teks":"Setujui lewat chat saja, PO di sistem tidak perlu diubah.",
+     "akibat":"Persetujuan di chat tidak tercatat di sistem. PO tetap Rp{hargaLamaF}, invoice Rp{hargaBaruF} → selisih saat pencocokan invoice."},
+    {"kunci":"c","teks":"Catat harga baru, revisi harga di PO, approve & simpan, lalu kirim ulang PO ke supplier."},
+    {"kunci":"d","teks":"Batalkan seluruh PO.",
+     "akibat":"Barang lain yang harganya tidak berubah ikut batal, dan outlet tidak mendapat barang untuk tanggal {tglDatang}."}],
+   "penjelasan":"Harga di PO harus sama dengan harga yang akan ditagih supplier. Revisi PO di sistem supaya PO, barang datang, dan invoice cocok. (Jika kenaikan harga perlu persetujuan atasan, ikuti batas wewenang di SOP Anda.)"},
+  {"id":"h-balas","scene":"h-start","aksi":"type","target":"#chat-input","teks":"{pesanHarga}","cocok":"panduan",
+   "instruksi":"Balas supplier: klik kolom pesan, lalu tekan huruf apa saja (1 kata per ketukan).",
+   "tugas":"Balas supplier bahwa PO akan direvisi.",
+   "petunjuk":"Kolom \"Tulis pesan…\" di bawah jendela chat. Klik, lalu tekan huruf apa saja sampai pesan lengkap."},
+  {"id":"h-kirim","scene":"h-typed","aksi":"click","target":"#chat-send",
+   "instruksi":"Klik tombol Kirim.","tugas":"Kirim balasan ke supplier.",
+   "petunjuk":"Tombol bulat ungu dengan tanda panah ➤ di kanan kolom pesan."},
+  {"id":"h-browser","scene":"h-sent","aksi":"click","target":"#tb-browser",
+   "instruksi":"Buka kembali browser (ikon bola dunia di taskbar) untuk merevisi PO.",
+   "tugas":"Kembali ke NusaERP untuk merevisi PO.",
+   "petunjuk":"Ikon bola dunia biru di taskbar bawah."},
+  {"id":"h-ubah-harga","scene":"h-form","aksi":"type","target":"#po-harga-{kodeHarga}","teks":"{hargaBaru}","cocok":"tepat","format":"angka",
+   "instruksi":"Klik kolom Harga pada baris {barangHarga}, ketik <code>{hargaBaru}</code> lalu tekan Enter.",
+   "tugas":"Ubah harga {barangHarga} di PO menjadi Rp{hargaBaruF}.",
+   "petunjuk":"Tabel Detail Barang, baris {barangHarga}, kolom Harga (isinya {hargaLamaF}). Klik, ketik {hargaBaru}, lalu tekan Enter."},
+  {"id":"h-approve","scene":"h-edited","aksi":"click","target":"#po-approve",
+   "instruksi":"Harga sudah berubah, jadi PO perlu dicek dan disetujui ulang. Centang kotak persetujuan.",
+   "tugas":"Setujui ulang PO yang sudah direvisi.",
+   "petunjuk":"Kotak bergaris putus-putus \"Sudah saya cek… Setujui PO\" di bagian bawah formulir."},
+  {"id":"h-simpan","scene":"h-approved","aksi":"click","target":"#po-save",
+   "instruksi":"Klik Simpan.","tugas":"Simpan PO revisi.",
+   "petunjuk":"Tombol hijau \"💾 Simpan\" di kanan bawah formulir."},
+  {"id":"h-kirim-ulang","scene":"h-saved","aksi":"click","target":"#po-resend",
+   "instruksi":"PO revisi tersimpan. Klik \"Kirim ulang PO\" agar supplier menerima PO terbaru.",
+   "tugas":"Kirim PO revisi ke supplier.",
+   "petunjuk":"Tombol biru \"📧 Kirim ulang PO\" di kanan bawah formulir."},
+  {"id":"h-cek-chat","scene":"h-resent","aksi":"click","target":"#tb-chat",
+   "instruksi":"Buka KabarIn untuk memastikan supplier menerima PO revisi.",
+   "tugas":"Pastikan supplier menerima PO revisi.",
+   "petunjuk":"Ikon balon chat ungu di taskbar bawah."}
+ ]},
+
+{"id":"kosong","judul":"Kasus: barang kosong","sceneAkhir":"k-done",
+ "deskripsi":"PO sudah terkirim. Supplier membalas bahwa salah satu barang sedang kosong.",
+ "pelajari":["Menilai balasan supplier tentang barang kosong","Memilih tindakan yang tidak merugikan outlet","Mengubah qty di PO & approve ulang","Mengirim ulang PO dan memberi info ke outlet"],
+ "ringkasan":"{barangKosong} sudah dikeluarkan dari PO {po}, PO revisi diterima supplier, dan outlet sudah diberi tahu.",
+ "langkah":[
+  {"id":"k-putuskan","scene":"k-start","aksi":"pilih","target":"#opt-b",
+   "instruksi":"Baca balasan supplier, lalu pilih tindakan yang paling tepat.",
+   "tugas":"Tentukan tindakan atas barang yang kosong di supplier.",
+   "petunjuk":"PO harus sesuai dengan barang yang benar-benar dikirim, dan outlet harus tahu lebih awal. Cari pilihan yang melakukan keduanya.",
+   "pertanyaan":"{barangKosong} kosong sampai 13-09-2026, padahal dibutuhkan tanggal {tglDatang}. Apa yang Anda lakukan?",
+   "kutipanDari":"Pak Budi ({supplierPendek})","kutipan":"{balasKosong}",
+   "opsi":[
+    {"kunci":"a","teks":"Diamkan saja. Nanti barang datang kurang, tidak apa-apa.",
+     "akibat":"Outlet tidak tahu {barangKosong} tidak datang sehingga menu bisa kosong, dan penerimaan barang selisih dengan PO."},
+    {"kunci":"b","teks":"Ubah qty {barangKosong} di PO menjadi 0, kirim ulang PO, lalu infokan ke outlet."},
+    {"kunci":"c","teks":"Tunda semua barang sampai tanggal 13.",
+     "akibat":"Barang lain yang tersedia ikut terlambat 2 hari, padahal dibutuhkan untuk operasional tanggal {tglDatang}."},
+    {"kunci":"d","teks":"Minta supplier mengirim barang pengganti apa saja tanpa mengubah PO.",
+     "akibat":"Barang pengganti yang tidak ada di PO sulit diterima dengan benar, dan harganya tidak terkontrol."}],
+   "penjelasan":"PO harus sesuai dengan barang yang benar-benar dikirim, dan outlet perlu tahu lebih awal supaya bisa dicarikan dari supplier lain. (Sesuaikan dengan SOP Anda bila pengganti wajib dicarikan oleh Purchasing.)"},
+  {"id":"k-balas","scene":"k-start","aksi":"type","target":"#chat-input","teks":"{pesanKosong}","cocok":"panduan",
+   "instruksi":"Balas supplier: klik kolom pesan, lalu tekan huruf apa saja (1 kata per ketukan).",
+   "tugas":"Balas supplier bahwa barang dikeluarkan dari PO.",
+   "petunjuk":"Kolom \"Tulis pesan…\" di bawah jendela chat. Klik, lalu tekan huruf apa saja sampai pesan lengkap."},
+  {"id":"k-kirim","scene":"k-typed","aksi":"click","target":"#chat-send",
+   "instruksi":"Klik tombol Kirim.","tugas":"Kirim balasan ke supplier.",
+   "petunjuk":"Tombol bulat ungu dengan tanda panah ➤ di kanan kolom pesan."},
+  {"id":"k-browser","scene":"k-sent","aksi":"click","target":"#tb-browser",
+   "instruksi":"Buka kembali browser (ikon bola dunia di taskbar) untuk merevisi PO.",
+   "tugas":"Kembali ke NusaERP untuk merevisi PO.",
+   "petunjuk":"Ikon bola dunia biru di taskbar bawah."},
+  {"id":"k-ubah-qty","scene":"k-form","aksi":"type","target":"#po-qty-{kodeKosong}","teks":"0","cocok":"tepat","format":"angka",
+   "instruksi":"Klik kolom Qty pada baris {barangKosong}, ketik <code>0</code> lalu tekan Enter.",
+   "tugas":"Ubah qty {barangKosong} di PO menjadi 0.",
+   "petunjuk":"Tabel Detail Barang, baris {barangKosong}, kolom Qty. Klik, ketik 0, lalu tekan Enter."},
+  {"id":"k-approve","scene":"k-edited","aksi":"click","target":"#po-approve",
+   "instruksi":"Qty sudah berubah, jadi PO perlu dicek dan disetujui ulang. Centang kotak persetujuan.",
+   "tugas":"Setujui ulang PO yang sudah direvisi.",
+   "petunjuk":"Kotak bergaris putus-putus \"Sudah saya cek… Setujui PO\" di bagian bawah formulir."},
+  {"id":"k-simpan","scene":"k-approved","aksi":"click","target":"#po-save",
+   "instruksi":"Klik Simpan.","tugas":"Simpan PO revisi.",
+   "petunjuk":"Tombol hijau \"💾 Simpan\" di kanan bawah formulir."},
+  {"id":"k-kirim-ulang","scene":"k-saved","aksi":"click","target":"#po-resend",
+   "instruksi":"PO revisi tersimpan. Klik \"Kirim ulang PO\" agar supplier menerima PO terbaru.",
+   "tugas":"Kirim PO revisi ke supplier.",
+   "petunjuk":"Tombol biru \"📧 Kirim ulang PO\" di kanan bawah formulir."},
+  {"id":"k-buka-chat","scene":"k-resent","aksi":"click","target":"#tb-chat",
+   "instruksi":"Buka KabarIn untuk memberi info ke outlet.",
+   "tugas":"Buka aplikasi chat untuk memberi info ke outlet.",
+   "petunjuk":"Ikon balon chat ungu di taskbar bawah."},
+  {"id":"k-grup-outlet","scene":"k-list","aksi":"click","target":"#chat-outlet",
+   "instruksi":"Supplier sudah menerima PO revisi (lihat pesan terakhirnya). Sekarang klik \"Grup Outlet {outlet}\".",
+   "tugas":"Buka grup chat outlet {outlet}.",
+   "petunjuk":"Daftar chat sebelah kiri, baris kedua: \"Grup Outlet {outlet}\"."},
+  {"id":"k-info-outlet","scene":"k-outlet","aksi":"type","target":"#chat-input","teks":"{pesanOutlet}","cocok":"panduan",
+   "instruksi":"Tulis info untuk outlet: klik kolom pesan, lalu tekan huruf apa saja.",
+   "tugas":"Beri tahu outlet bahwa {barangKosong} tidak dikirim.",
+   "petunjuk":"Kolom \"Tulis pesan…\" di bawah jendela chat. Klik, lalu tekan huruf apa saja sampai pesan lengkap."},
+  {"id":"k-kirim-outlet","scene":"k-outlet-typed","aksi":"click","target":"#chat-send",
+   "instruksi":"Klik tombol Kirim.","tugas":"Kirim info ke grup outlet.",
+   "petunjuk":"Tombol bulat ungu dengan tanda panah ➤ di kanan kolom pesan."}
+ ]}
+]}
 </script>
 
 <script>
@@ -630,10 +806,10 @@ table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
    1. KONFIGURASI — ubah di sini untuk menyesuaikan data
    ===================================================================== */
 const CONFIG = {
-  nilaiLulus: 80,            // skor minimal "LULUS" di mode Uji
-  bantuanUjiSetelah: 3,      // mode Uji: tampilkan petunjuk setelah N salah (0 = tidak pernah). Langkah ditandai "dibantu" & bernilai 0.
-  kecepatanDemo: 1,          // 1 = normal, 2 = 2x lebih cepat
-  sceneAkhir: 'chat-done',   // scene yang diputar setelah langkah terakhir
+  nilaiLulus: 80,              // skor minimal "LULUS" di mode Uji (bila LMS mengirim mastery_score, nilai LMS dipakai)
+  bantuanUjiSetelah: 3,        // mode Uji: tampilkan petunjuk setelah N salah (0 = tidak pernah). Langkah ditandai "dibantu" & bernilai 0.
+  kecepatanDemo: 1,            // 1 = normal, 2 = 2x lebih cepat
+  wajibSemuaSkenario: false,   // SCORM: true = lulus hanya bila SEMUA skenario mode Uji >= nilai lulus (nilai = skor terendah)
   data: {
     perusahaan: 'PT Rasa Makmur Sejahtera',
     pr: 'PR202609090294',
@@ -650,17 +826,44 @@ const CONFIG = {
     emailPR: 'noreply@rasamakmur.test',
     robot: 'Robot NusaERP',
     emailRobot: 'robot@nusaerp.test',
-    pesanChat: 'Selamat pagi Bapak/Ibu, PO {po} sudah dikirim Robot NusaERP lewat email. Mohon konfirmasi apakah email PO sudah diterima, dan barang diproses sesuai tanggal kedatangan {tglDatang}. Terima kasih.'
+    // Skenario kasus: kode barang mengacu ke PO_ITEMS di bawah
+    kodeHarga: 'SYR-013', hargaBaru: 30000,
+    kodeKosong: 'SYR-014',
+    // Isi chat ({nama} boleh dipakai di dalamnya)
+    pesanChat: 'Selamat pagi Bapak/Ibu, PO {po} sudah dikirim Robot NusaERP lewat email. Mohon konfirmasi apakah email PO sudah diterima, dan barang diproses sesuai tanggal kedatangan {tglDatang}. Terima kasih.',
+    balasOk: 'Pagi Bu, email PO {po} sudah kami terima ✅ Barang akan dikirim sesuai jadwal tanggal {tglDatang}. Terima kasih.',
+    balasHarga: 'Pagi Bu, email PO sudah kami terima. Tapi mohon maaf, harga {barangHarga} naik jadi Rp{hargaBaruF}/kg mulai minggu ini (di PO tertulis Rp{hargaLamaF}).',
+    pesanHarga: 'Baik Pak, harga {barangHarga} Rp{hargaBaruF}/kg kami catat. PO akan kami revisi dan kirim ulang hari ini.',
+    balasKosong: 'Pagi Bu, email PO sudah kami terima. Mohon maaf, {barangKosong} sedang kosong sampai tanggal 13-09-2026. Barang lain aman, dikirim sesuai jadwal.',
+    pesanKosong: 'Baik Pak, {barangKosong} kami keluarkan dari PO. PO revisi akan kami kirim ulang, barang lain tetap dikirim tanggal {tglDatang}.',
+    balasRevisi: 'Baik Bu, PO revisi sudah kami terima. Barang dikirim sesuai jadwal tanggal {tglDatang} 🙏',
+    pesanOutlet: 'Info: {barangKosong} dari {supplierPendek} kosong sampai 13-09-2026 dan sudah dikeluarkan dari PO {po}. Mohon dikabari jika perlu dicarikan dari supplier lain.',
+    balasOutlet: 'Siap, terima kasih infonya 🙏 {barangKosong} kami carikan dari supplier lain.'
   }
 };
 const D = CONFIG.data;
-const tpl = s => typeof s === 'string' ? s.replace(/\{(\w+)\}/g, (m, k) => (k in D ? tpl(String(D[k])) : m)) : s;
 
-const STEPS = JSON.parse(document.getElementById('steps-data').textContent).map(st => {
-  const o = {};
-  for (const k in st) o[k] = Array.isArray(st[k]) ? st[k].map(tpl) : tpl(st[k]);
-  return o;
-});
+/* Barang di PO (hanya barang dari supplier sayur → Robot memecah PR per supplier) */
+const PO_ITEMS = [
+  ['SYR-011', 'Selada Keriting', 'KG', 1.5, 25000], ['SYR-012', 'Daun Bawang', 'KG', 1, 24000],
+  ['SYR-013', 'Jamur Tiram', 'KG', 5, 27000], ['SYR-014', 'Kol Hijau', 'KG', 20, 8000], ['SYR-015', 'Wortel', 'KG', 1, 16000]
+];
+const rp = n => n.toLocaleString('id-ID');
+const qty = n => n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const itemOf = kode => PO_ITEMS.find(r => r[0] === kode) || ['', '?', '', 0, 0];
+// Nilai turunan agar teks selalu cocok dengan data barang
+D.barangHarga = itemOf(D.kodeHarga)[1];
+D.hargaLama = itemOf(D.kodeHarga)[4];
+D.hargaLamaF = rp(D.hargaLama);
+D.hargaBaruF = rp(D.hargaBaru);
+D.barangKosong = itemOf(D.kodeKosong)[1];
+
+const tpl = s => typeof s === 'string' ? s.replace(/\{(\w+)\}/g, (m, k) => (k in D ? tpl(String(D[k])) : m)) : s;
+const deepTpl = v => Array.isArray(v) ? v.map(deepTpl)
+  : (v && typeof v === 'object') ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, deepTpl(x)])) : tpl(v);
+
+const SCENARIOS = deepTpl(JSON.parse(document.getElementById('steps-data').textContent).skenario);
+let STEPS = SCENARIOS[0].langkah;
 
 /* =====================================================================
    2. SCENES — kondisi layar (deklaratif). render() menerapkannya ke DOM,
@@ -669,12 +872,13 @@ const STEPS = JSON.parse(document.getElementById('steps-data').textContent).map(
 const BASE = {
   notif: null,                 // null | 'pr' | 'robot'
   sound: null,                 // 'ding' saat scene dimulai
-  fx: null,                    // nama efek di FX
+  fx: null,                    // efek di FX, mis. 'toastSaved' atau 'balas:sup-ok'
   front: null,                 // jendela paling depan: 'mail' | 'browser' | 'chat'
   badge: { mail: 0 },
   mail: { open: false, sel: null, robot: false },
-  browser: { open: false, url: '', page: null, modal: null, approved: false, saved: false },
-  chat: { open: false, room: false, text: '', sent: false }
+  browser: { open: false, url: '', page: null, modal: null, approved: false, saved: false,
+             edit: {}, revisi: false, resent: false },
+  chat: { open: false, room: false, text: '', logs: {} }   // logs: { grp: [kunci MSG...], outlet: [...] }
 };
 function merge(a, b) {
   const out = JSON.parse(JSON.stringify(a));
@@ -684,6 +888,7 @@ function merge(a, b) {
 const ext = (prev, over) => merge(merge(prev, { notif: null, sound: null, fx: null }), over);
 
 const SCENES = {};
+// --- Alur normal ---
 SCENES['idle']            = merge(BASE, {});
 SCENES['notif-pr']        = ext(SCENES.idle, { notif: 'pr', sound: 'ding', badge: { mail: 1 } });
 SCENES['mail-inbox']      = ext(SCENES['notif-pr'], { mail: { open: true }, front: 'mail' });
@@ -699,9 +904,31 @@ SCENES['erp-po-pdf']      = ext(SCENES['erp-po-saved'], { browser: { modal: 'po'
 SCENES['notif-robot']     = ext(SCENES['erp-po-saved'], { notif: 'robot', sound: 'ding', badge: { mail: 1 }, mail: { robot: true } });
 SCENES['mail-read-robot'] = ext(SCENES['notif-robot'], { mail: { sel: 'robot' }, badge: { mail: 0 }, front: 'mail' });
 SCENES['chat-list']       = ext(SCENES['mail-read-robot'], { chat: { open: true }, front: 'chat' });
-SCENES['chat-room']       = ext(SCENES['chat-list'], { chat: { room: true } });
+SCENES['chat-room']       = ext(SCENES['chat-list'], { chat: { room: 'grp' } });
 SCENES['chat-typed']      = ext(SCENES['chat-room'], { chat: { text: '{pesanChat}' } });
-SCENES['chat-done']       = ext(SCENES['chat-typed'], { chat: { text: '', sent: true }, fx: 'supplierReply' });
+SCENES['chat-done']       = ext(SCENES['chat-typed'], { chat: { text: '', logs: { grp: ['me-konfirmasi'] } }, fx: 'balas:sup-ok' });
+
+// --- Kasus harga naik & barang kosong: dimulai setelah konfirmasi ke supplier ---
+function revisionScenes(p, supKey, meKey, msgKey, edit) {
+  const g0 = ['me-konfirmasi', supKey];
+  SCENES[p + '-start']    = ext(SCENES['chat-typed'], { chat: { text: '', logs: { grp: g0 } } });
+  SCENES[p + '-typed']    = ext(SCENES[p + '-start'], { chat: { text: '{' + msgKey + '}' } });
+  SCENES[p + '-sent']     = ext(SCENES[p + '-start'], { chat: { logs: { grp: g0.concat(meKey) } } });
+  SCENES[p + '-form']     = ext(SCENES[p + '-sent'], { front: 'browser', browser: { page: 'po-form', modal: null } });
+  SCENES[p + '-edited']   = ext(SCENES[p + '-form'], { browser: { edit, approved: false, saved: false, revisi: true } });
+  SCENES[p + '-approved'] = ext(SCENES[p + '-edited'], { browser: { approved: true } });
+  SCENES[p + '-saved']    = ext(SCENES[p + '-approved'], { browser: { saved: true }, fx: 'toastSaved' });
+  SCENES[p + '-resent']   = ext(SCENES[p + '-saved'], { browser: { resent: true }, fx: 'toastResent' });
+  return g0.concat(meKey);
+}
+revisionScenes('h', 'sup-harga', 'me-harga', 'pesanHarga', { [D.kodeHarga]: { harga: D.hargaBaru } });
+SCENES['h-done']          = ext(SCENES['h-resent'], { front: 'chat', fx: 'balas:sup-revisi' });
+
+const gK = revisionScenes('k', 'sup-kosong', 'me-kosong', 'pesanKosong', { [D.kodeKosong]: { qty: 0 } });
+SCENES['k-list']          = ext(SCENES['k-resent'], { front: 'chat', chat: { room: false, logs: { grp: gK.concat('sup-revisi') } } });
+SCENES['k-outlet']        = ext(SCENES['k-list'], { chat: { room: 'outlet' } });
+SCENES['k-outlet-typed']  = ext(SCENES['k-outlet'], { chat: { text: '{pesanOutlet}' } });
+SCENES['k-done']          = ext(SCENES['k-outlet'], { chat: { logs: { outlet: ['me-outlet'] } }, fx: 'balas:out-reply' });
 
 /* =====================================================================
    3. KONTEN APLIKASI FIKTIF
@@ -714,8 +941,6 @@ const ICONS = {
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 13H7zM4 7h16M9 7V4h6v3" fill="none" stroke="#fff" stroke-width="2"/></svg>'
 };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const rp = n => n.toLocaleString('id-ID');
-const qty = n => n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function terbilang(n) {
   const a = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
   n = Math.floor(n);
@@ -739,15 +964,8 @@ const MAILS = [
   { id: 'fin', from: 'Finance', subj: 'Rekap Penjualan Mingguan', time: 'Sen', prev: 'Terlampir rekap penjualan minggu lalu…' }
 ];
 const PR_ITEMS = [
-  ['BRS-001', 'Beras Putih Premium', 'KG', 10], ['TLR-002', 'Telur Ayam', 'KG', 15], ['TAH-003', 'Tahu Sutra', 'PCK', 24],
-  ['SYR-011', 'Selada Keriting', 'KG', 1.5], ['SYR-012', 'Daun Bawang', 'KG', 1], ['SYR-013', 'Jamur Tiram', 'KG', 5],
-  ['SYR-014', 'Kol Hijau', 'KG', 20], ['SYR-015', 'Wortel', 'KG', 1]
-];
-const PO_ITEMS = [  // hanya barang dari supplier sayur → Robot memecah PR per supplier
-  ['SYR-011', 'Selada Keriting', 'KG', 1.5, 25000], ['SYR-012', 'Daun Bawang', 'KG', 1, 24000],
-  ['SYR-013', 'Jamur Tiram', 'KG', 5, 27000], ['SYR-014', 'Kol Hijau', 'KG', 20, 8000], ['SYR-015', 'Wortel', 'KG', 1, 16000]
-];
-const PO_TOTAL = PO_ITEMS.reduce((s, r) => s + r[3] * r[4], 0);
+  ['BRS-001', 'Beras Putih Premium', 'KG', 10], ['TLR-002', 'Telur Ayam', 'KG', 15], ['TAH-003', 'Tahu Sutra', 'PCK', 24]
+].concat(PO_ITEMS.map(r => r.slice(0, 4)));
 const PRS = [
   { code: D.pr, date: '09-09-2026', req: '11-09-2026', branch: D.cabang, info: 'Dari sistem AI (PR Suggestion)' },
   { code: 'PR202609090287', date: '09-09-2026', req: '12-09-2026', branch: 'Outlet Pasar Baru', info: 'Dari sistem AI (PR Suggestion)' },
@@ -760,9 +978,30 @@ const POS = [
   { no: 'PO202609090495', supplier: 'CV Bumbu Nusantara', pr: 'PR202609090287', by: 'robot', status: 'Draft' },
   { no: 'PO202609080480', supplier: 'PT Minyak Sentosa', pr: 'PR202609080311', by: 'user', status: 'Authorized' }
 ];
-const CHATS = [
-  { id: 'chat-grp', name: `PO Supplier – ${D.supplierPendek}`, last: 'Pak Budi: Baik Bu, siap 🙏', time: 'Kemarin', av: '🛒', color: '#16a34a' },
-  { id: 'chat-outlet', name: `Grup Outlet ${D.outlet}`, last: 'Kepala Outlet: Stok tahu tinggal sedikit', time: '09:40', av: 'O', color: '#0284c7' },
+
+/* Chat: ruang obrolan & isi pesan. Scene menyebut kunci pesan di chat.logs */
+const SUP = 'Pak Budi (Supplier)', KO = 'Kepala Outlet';
+const MSG = {
+  'g-1': { who: SUP, t: 'Selamat sore Bu, PO minggu lalu sudah kami kirim semua ya.', tm: '16:20' },
+  'g-2': { me: true, t: 'Baik Pak, terima kasih.', tm: '16:25' },
+  'g-3': { who: SUP, t: 'Baik Bu, siap 🙏', tm: '16:26' },
+  'o-1': { who: KO, t: 'Stok tahu tinggal sedikit, mohon dipantau ya.', tm: '09:40' },
+  'o-2': { me: true, t: 'Siap, sudah masuk PR hari ini.', tm: '09:42' },
+  'me-konfirmasi': { me: true, t: '{pesanChat}' },
+  'sup-ok': { who: SUP, t: '{balasOk}' },
+  'sup-harga': { who: SUP, t: '{balasHarga}' },
+  'me-harga': { me: true, t: '{pesanHarga}' },
+  'sup-kosong': { who: SUP, t: '{balasKosong}' },
+  'me-kosong': { me: true, t: '{pesanKosong}' },
+  'sup-revisi': { who: SUP, t: '{balasRevisi}' },
+  'me-outlet': { me: true, t: '{pesanOutlet}' },
+  'out-reply': { who: KO, t: '{balasOutlet}' }
+};
+const ROOMS = {
+  grp: { item: 'chat-grp', name: `PO Supplier – ${D.supplierPendek}`, sub: 'Pak Budi, Bu Sari, Anda', av: '🛒', color: '#16a34a', base: ['day:Kemarin', 'g-1', 'g-2', 'g-3', 'day:Hari ini'] },
+  outlet: { item: 'chat-outlet', name: `Grup Outlet ${D.outlet}`, sub: 'Kepala Outlet, Kasir, Anda', av: 'O', color: '#0284c7', base: ['day:Hari ini', 'o-1', 'o-2'] }
+};
+const CHATS_LAIN = [
   { id: 'chat-telur', name: 'PO Supplier – CV Telur Makmur', last: 'Anda: Terima kasih Pak', time: 'Sen', av: '🥚', color: '#ca8a04' },
   { id: 'chat-info', name: 'Info Purchasing', last: 'Rapat mingguan hari Jumat jam 10', time: 'Sen', av: 'i', color: '#64748b' }
 ];
@@ -795,6 +1034,24 @@ function mailBody(id) {
     <p>Terima kasih.<br>Best Regards,<br><b>Purchasing Dept</b></p>
     <span class="attach"><span class="pdf">PDF</span>${D.po}.pdf · 61 KB</span>`;
   return `${back}<h2>${esc(m.subj)}</h2><div class="mail-meta"><b>${esc(m.from)}</b></div><p>${esc(m.prev)}</p>`;
+}
+
+/* Barang PO setelah revisi (edit = { kode: { qty?, harga? } }) */
+function poRows(edit) {
+  return PO_ITEMS.map(r => {
+    const e = (edit || {})[r[0]] || {};
+    const q = 'qty' in e ? e.qty : r[3], h = 'harga' in e ? e.harga : r[4];
+    return { kode: r[0], nama: r[1], unit: r[2], q, h, qc: 'qty' in e, hc: 'harga' in e };
+  });
+}
+const poTotal = edit => poRows(edit).reduce((s, x) => s + x.q * x.h, 0);
+function renderPOItems(edit) {
+  const rows = poRows(edit);
+  $('#po-items').innerHTML = rows.map(x => `<tr class="${x.q === 0 ? 'nol' : ''}"><td class="hide-sm">${x.kode}</td><td class="nm">${x.nama}</td><td class="hide-sm">${x.unit}</td>
+      <td class="num"><input class="cell-in${x.qc ? ' changed' : ''}" id="po-qty-${x.kode}" inputmode="decimal" autocomplete="off" aria-label="Qty ${x.nama}" value="${qty(x.q)}"></td>
+      <td class="num"><input class="cell-in${x.hc ? ' changed' : ''}" id="po-harga-${x.kode}" inputmode="numeric" autocomplete="off" aria-label="Harga ${x.nama}" value="${rp(x.h)}"></td>
+      <td class="num hide-sm">${rp(x.q * x.h)}</td></tr>`).join('')
+    + `<tr><td class="hide-sm"></td><td colspan="3"><b>Grand Total</b></td><td class="num" colspan="2"><b>Rp ${rp(poTotal(edit))}</b></td></tr>`;
 }
 
 function buildERP() {
@@ -849,13 +1106,12 @@ function buildERP() {
               .map(([k, v]) => `<div class="field"><label>${k}</label><div class="fake-in">${esc(v)}</div></div>`).join('')}
           </div></div>
         <div class="card"><h3>Detail Barang</h3><div class="tbl-wrap"><table class="grid">
-          <thead><tr><th>Kode</th><th>Nama Barang</th><th>Unit</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Total</th></tr></thead>
-          <tbody>${PO_ITEMS.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="num">${qty(r[3])}</td><td class="num">${rp(r[4])}</td><td class="num">${rp(r[3] * r[4])}</td></tr>`).join('')}
-            <tr><td colspan="5" class="num"><b>Grand Total</b></td><td class="num"><b>${rp(PO_TOTAL)}</b></td></tr></tbody>
+          <thead><tr><th class="hide-sm">Kode</th><th>Nama Barang</th><th class="hide-sm">Unit</th><th class="num">Qty</th><th class="num">Harga</th><th class="num hide-sm">Total</th></tr></thead>
+          <tbody id="po-items"></tbody>
         </table></div></div>
         <div class="form-foot">
           <button type="button" class="chk" id="po-approve" role="checkbox" aria-checked="false"><span class="box" aria-hidden="true"></span><span>Sudah saya cek (supplier, tanggal kedatangan, qty &amp; harga) — <b>Setujui PO</b></span></button>
-          <span class="btns"><button type="button" class="btn ghost" id="po-cancel">Batal</button><button type="button" class="btn green" id="po-save">💾 Simpan</button><button type="button" class="btn red" id="po-pdf" hidden>📄 Cetak PDF</button></span>
+          <span class="btns"><button type="button" class="btn ghost" id="po-cancel">Batal</button><button type="button" class="btn green" id="po-save">💾 Simpan</button><button type="button" class="btn red" id="po-pdf" hidden>📄 Cetak PDF</button><button type="button" class="btn blue" id="po-resend" hidden>📧 Kirim ulang PO</button></span>
         </div>
       </section>
     </main>
@@ -869,36 +1125,51 @@ function paperPR() {
   <tbody>${PR_ITEMS.map((r, i) => `<tr><td>${i + 1}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="num">${qty(r[3])}</td><td>KEBUTUHAN OPS</td></tr>`).join('')}</tbody></table>
   <div class="sign"><span>Created by: PR Suggestion System (AI)</span><span>Authorized by: Kepala Outlet ${D.outlet}</span></div>`;
 }
-function paperPO() {
+function paperPO(edit) {
+  const total = poTotal(edit);
   return `<div class="co">Company:<b>${esc(D.perusahaan)}</b></div><h1>Purchase Order</h1>
   <div class="kv"><div><span>Purchase Type</span><span>: Goods</span></div><div><span>PO Number</span><span>: ${D.po}</span></div>
   <div><span>Supplier</span><span>: <b>${esc(D.supplier)}</b></span></div><div><span>Purchase Date</span><span>: 09-Sep-2026</span></div>
   <div><span>Branch</span><span>: ${esc(D.cabang)}</span></div><div><span>Required Date</span><span>: <b>11-Sep-2026</b></span></div>
   <div><span>PR Number</span><span>: ${D.pr}</span></div><div><span>Currency</span><span>: IDR</span></div></div>
   <table><thead><tr><th>No</th><th>Nama Barang</th><th>Unit</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Total</th></tr></thead>
-  <tbody>${PO_ITEMS.map((r, i) => `<tr><td>${i + 1}</td><td>${r[1]}</td><td>${r[2]}</td><td class="num">${qty(r[3])}</td><td class="num">${rp(r[4])}</td><td class="num">${rp(r[3] * r[4])}</td></tr>`).join('')}
-  <tr><td colspan="5"><b>${terbilang(PO_TOTAL)} Rupiah</b></td><td class="num"><b>${rp(PO_TOTAL)}</b></td></tr></tbody></table>
+  <tbody>${poRows(edit).map((x, i) => `<tr><td>${i + 1}</td><td>${x.nama}</td><td>${x.unit}</td><td class="num">${qty(x.q)}</td><td class="num">${rp(x.h)}</td><td class="num">${rp(x.q * x.h)}</td></tr>`).join('')}
+  <tr><td colspan="5"><b>${terbilang(total)} Rupiah</b></td><td class="num"><b>${rp(total)}</b></td></tr></tbody></table>
   <div class="sign"><span>Status: <b style="color:#15803d">Authorized</b></span><span>Authorized by: Tim Purchasing</span></div>`;
 }
 function buildChat() {
-  $('#chat-list').insertAdjacentHTML('beforeend', CHATS.map(c => `
-    <button type="button" class="chat-item" id="${c.id}"><span class="av" style="background:${c.color}">${c.av}</span>
-      <span class="ci-body"><span class="ci-top"><b>${esc(c.name)}</b><small>${c.time}</small></span><span class="ci-last">${esc(c.last)}</span></span></button>`).join(''));
-  const g = CHATS[0];
-  $('#room-av').textContent = g.av; $('#room-av').style.background = g.color;
-  $('#room-name').textContent = g.name; $('#room-sub').textContent = 'Pak Budi, Bu Sari, Anda';
+  const item = (id, name, av, color, last, time) => `
+    <button type="button" class="chat-item" id="${id}"><span class="av" style="background:${color}">${av}</span>
+      <span class="ci-body"><span class="ci-top"><b>${esc(name)}</b><small id="${id}-time">${time}</small></span><span class="ci-last" id="${id}-last">${esc(last)}</span></span></button>`;
+  $('#chat-list').insertAdjacentHTML('beforeend',
+    Object.values(ROOMS).map(r => item(r.item, r.name, r.av, r.color, '', '')).join('')
+    + CHATS_LAIN.map(c => item(c.id, c.name, c.av, c.color, c.last, c.time)).join(''));
 }
 const nowHM = () => new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
 function bubble(who, text, me, time) {
   return `<div class="msg${me ? ' me' : ''}">${who ? `<div class="who">${esc(who)}</div>` : ''}<div class="tx">${esc(text)}</div><div class="tm">${time}${me ? ' ✓✓' : ''}</div></div>`;
 }
-function renderMsgs(st) {
-  let h = '<span class="day">Kemarin</span>' + bubble('Pak Budi (Supplier)', 'Selamat sore Bu, PO minggu lalu sudah kami kirim semua ya.', false, '16:20')
-        + bubble('', 'Baik Pak, terima kasih.', true, '16:25') + bubble('Pak Budi (Supplier)', 'Baik Bu, siap 🙏', false, '16:26')
-        + '<span class="day">Hari ini</span>';
-  if (st.chat.sent) h += bubble('', tpl('{pesanChat}'), true, nowHM());
-  $('#msgs').innerHTML = h;
-  $('#msgs').scrollTop = 1e6;
+const msgHtml = k => k.indexOf('day:') === 0 ? `<span class="day">${k.slice(4)}</span>`
+  : (m => bubble(m.me ? '' : m.who, tpl(m.t), m.me, m.tm || nowHM()))(MSG[k]);
+function renderChat(c) {
+  $('#chat').classList.toggle('inroom', !!c.room);
+  for (const key in ROOMS) {
+    const R = ROOMS[key], keys = R.base.concat((c.logs || {})[key] || []);
+    const m = MSG[keys.filter(x => x.indexOf('day:') !== 0).pop()];
+    $('#' + R.item + '-last').textContent = (m.me ? 'Anda' : m.who.replace(/\s*\(.*\)/, '')) + ': ' + tpl(m.t);
+    $('#' + R.item + '-time').textContent = m.tm || nowHM();
+    $('#' + R.item).classList.toggle('sel', c.room === key);
+  }
+  $('#room').hidden = !c.room; $('#room-empty').hidden = !!c.room;
+  if (c.room) {
+    const R = ROOMS[c.room];
+    $('#room-av').textContent = R.av; $('#room-av').style.background = R.color;
+    $('#room-name').textContent = R.name; $('#room-sub').textContent = R.sub;
+    $('#msgs').innerHTML = R.base.concat((c.logs || {})[c.room] || []).map(msgHtml).join('');
+    $('#msgs').scrollTop = 1e6;
+  }
+  $('#chat-input').value = tpl(c.text);
+  $('#chat-input').classList.remove('typing');
 }
 
 /* =====================================================================
@@ -936,14 +1207,18 @@ function render(st) {
     $$('#erp .page').forEach(p => { p.hidden = p.dataset.page !== b.page; });
     $('#nav-pr').classList.toggle('on', b.page === 'pr');
     $('#nav-po').classList.toggle('on', b.page !== 'pr');
+    renderPOItems(b.edit);
     $('#po-approve').setAttribute('aria-checked', String(!!b.approved));
-    $('#po-pdf').hidden = !b.saved;
-    $('#po-status').className = 'pill ' + (b.saved ? 'ok' : 'draft');
-    $('#po-status').textContent = b.saved ? 'Authorized ✓' : 'Draft · dibuat Robot';
+    $('#po-pdf').hidden = !b.saved || b.revisi;
+    $('#po-resend').hidden = !(b.saved && b.revisi && !b.resent);
+    const pill = $('#po-status');
+    pill.className = 'pill ' + (b.saved ? 'ok' : 'draft');
+    pill.textContent = b.revisi ? (b.saved ? (b.resent ? 'Authorized · Revisi 1 · terkirim' : 'Authorized · Revisi 1') : 'Revisi · belum disimpan')
+                                : (b.saved ? 'Authorized ✓' : 'Draft · dibuat Robot');
   }
   const modal = $('#pdf-modal');
   if (b.modal) {
-    $('#pdf-paper').innerHTML = b.modal === 'pr' ? paperPR() : paperPO();
+    $('#pdf-paper').innerHTML = b.modal === 'pr' ? paperPR() : paperPO(b.edit);
     $('#pdf-title').textContent = (b.modal === 'pr' ? D.pr : D.po) + '.pdf';
     $('.pdf-scroll').scrollTop = 0;
   }
@@ -951,12 +1226,10 @@ function render(st) {
   $('#erp-toast').classList.remove('on');
 
   // Chat
-  $('#chat').classList.toggle('inroom', st.chat.room);
-  $('#chat-grp').classList.toggle('sel', st.chat.room);
-  $('#room').hidden = !st.chat.room; $('#room-empty').hidden = st.chat.room;
-  $('#chat-input').value = tpl(st.chat.text);
-  $('#chat-input').classList.remove('typing');
-  renderMsgs(st);
+  renderChat(st.chat);
+
+  // Dialog keputusan selalu ditutup; gotoStep membukanya untuk langkah "pilih"
+  const dec = $('#decision'); dec.classList.remove('open'); dec.inert = true;
 
   // Notifikasi
   const n = $('#notif');
@@ -976,29 +1249,35 @@ function render(st) {
   });
 }
 
-/* Efek tambahan saat scene dimulai. Boleh mengembalikan Promise. */
+/* Efek tambahan saat scene dimulai: "nama" atau "nama:argumen". Boleh mengembalikan Promise. */
+function toast(text) {
+  const t = $('#erp-toast');
+  t.textContent = text;
+  requestAnimationFrame(() => t.classList.add('on'));
+  setTimeout(() => t.classList.remove('on'), 2600);
+}
 const FX = {
-  toastSaved() {
-    const t = $('#erp-toast');
-    t.textContent = '✔ PO berhasil disimpan · Status: Authorized';
-    requestAnimationFrame(() => t.classList.add('on'));
-    setTimeout(() => t.classList.remove('on'), 2600);
-  },
-  async supplierReply(id) {
-    const msgs = $('#msgs');
+  toastSaved() { toast('✔ PO berhasil disimpan · Status: Authorized'); },
+  toastResent() { toast('📧 PO revisi dikirim ulang ke ' + D.supplier); },
+  async balas(id, key) {               // lawan bicara "sedang mengetik…", lalu pesannya muncul
+    const m = MSG[key], msgs = $('#msgs');
     await sleep(800); if (!alive(id)) return;
-    msgs.insertAdjacentHTML('beforeend', '<div class="msg" id="typing-ind"><div class="who">Pak Budi (Supplier)</div><span class="dots"><i></i><i></i><i></i></span></div>');
+    msgs.insertAdjacentHTML('beforeend', `<div class="msg" id="typing-ind"><div class="who">${esc(m.who)}</div><span class="dots"><i></i><i></i><i></i></span></div>`);
     msgs.scrollTop = 1e6;
     await sleep(1500); if (!alive(id)) return;
     $('#typing-ind').remove();
-    msgs.insertAdjacentHTML('beforeend', bubble('Pak Budi (Supplier)', '', false, nowHM()));
-    const tx = $('.msg:last-child .tx', msgs);
-    const text = Array.from(`Pagi Bu, email PO ${D.po} sudah kami terima ✅ Barang akan dikirim sesuai jadwal tanggal ${D.tglDatang}. Terima kasih.`);
+    msgs.insertAdjacentHTML('beforeend', bubble(m.who, '', false, nowHM()));
+    const tx = $('.msg:last-child .tx', msgs), text = Array.from(tpl(m.t));
     for (let k = 1; k <= text.length; k++) { tx.textContent = text.slice(0, k).join(''); msgs.scrollTop = 1e6; await sleep(16); if (!alive(id)) return; }
     Sound.pop();
     await sleep(1000);
   }
 };
+function runFx(name, id) {
+  if (!name) return Promise.resolve();
+  const [fn, arg] = name.split(':');
+  return FX[fn] ? Promise.resolve(FX[fn](id, arg)) : Promise.resolve();
+}
 
 /* =====================================================================
    5. SUARA (Web Audio API) — aman bila browser tidak mendukung
@@ -1046,6 +1325,7 @@ const SCORM = (function () {
   const commit = () => { try { if (live) api.LMSCommit(''); } catch (e) { /* abaikan */ } };
   const pad = x => String(x).padStart(2, '0');
   const span = ms => { const s = Math.floor(ms / 1000); return String(Math.floor(s / 3600)).padStart(4, '0') + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60) + '.00'; };
+  const score = v => { set('cmi.core.score.min', 0); set('cmi.core.score.max', 100); set('cmi.core.score.raw', v); };
   return {
     init() {
       api = find(window) || (window.opener ? find(window.opener) : null);
@@ -1058,11 +1338,20 @@ const SCORM = (function () {
       }
       return live;
     },
-    report(mode, score, passed) {
+    /* best = skor Uji terbaik per skenario, disimpan di suspend_data agar tetap ada di sesi berikutnya */
+    report(mode, sc, passed, best) {
       if (!live) return;
       if (mode === 'test') {
-        set('cmi.core.score.min', 0); set('cmi.core.score.max', 100); set('cmi.core.score.raw', score);
-        set('cmi.core.lesson_status', passed ? 'passed' : 'failed');
+        set('cmi.suspend_data', JSON.stringify({ best }));
+        if (CONFIG.wajibSemuaSkenario) {
+          const ids = SCENARIOS.map(s => s.id);
+          const min = Math.min.apply(null, ids.map(i => (i in best ? best[i] : 0)));
+          score(min);
+          set('cmi.core.lesson_status', ids.some(i => !(i in best)) ? 'incomplete' : (min >= CONFIG.nilaiLulus ? 'passed' : 'failed'));
+        } else if (!(get('cmi.core.lesson_status') === 'passed' && !passed)) {   // status lulus tidak diturunkan
+          score(sc);
+          set('cmi.core.lesson_status', passed ? 'passed' : 'failed');
+        }
       } else if (mode === 'try') {
         const st = get('cmi.core.lesson_status');
         if (st !== 'passed' && st !== 'failed') set('cmi.core.lesson_status', 'completed');
@@ -1084,8 +1373,9 @@ const SCORM = (function () {
    7. MESIN SIMULASI (state machine)
    ===================================================================== */
 const S = {
-  mode: null, i: 0, run: 0, active: false, paused: false,
-  wrong: 0, err: [], helped: [], totalErr: 0, t0: 0, tEnd: 0, typed: 0, guide: null
+  mode: null, scn: SCENARIOS[0], i: 0, run: 0, active: false, paused: false, awaitNext: false,
+  wrong: 0, err: [], helped: [], totalErr: 0, t0: 0, tEnd: 0, typed: 0, lastVal: null, guide: null,
+  best: {}                       // skor Uji terbaik per skenario
 };
 const CANCEL = { cancel: true };
 const alive = id => id === S.run;
@@ -1115,7 +1405,9 @@ function ensureVisible(el) {
     const cs = getComputedStyle(p);
     if (!/(auto|scroll)/.test(cs.overflowY + cs.overflowX)) continue;
     const pr = p.getBoundingClientRect(), r = el.getBoundingClientRect();
-    if (r.bottom > pr.bottom) p.scrollTop += r.bottom - pr.bottom + 16;
+    const foot = $('.page:not([hidden]) .form-foot', p);          // footer lengket bisa menutupi target
+    const footH = foot && foot.getClientRects().length && !foot.contains(el) ? foot.offsetHeight : 0;
+    if (r.bottom > pr.bottom - footH) p.scrollTop += r.bottom - pr.bottom + footH + 16;
     else if (r.top < pr.top) p.scrollTop -= pr.top - r.top + 16;
     if (r.right > pr.right) p.scrollLeft += r.right - pr.right + 8;
     else if (r.left < pr.left) p.scrollLeft -= pr.left - r.left + 8;
@@ -1140,7 +1432,7 @@ function placeGuide() {
     const el = S.guide.el, r = relRect(el), sw = screen.clientWidth, sh = screen.clientHeight, pad = 5;
     Object.assign(ring.style, { left: r.x - pad + 'px', top: r.y - pad + 'px', width: r.w + pad * 2 + 'px', height: r.h + pad * 2 + 'px' });
     const tw = tip.offsetWidth, th = tip.offsetHeight, gap = 14;
-    let below = r.y + r.h + gap + th < sh - 4 || r.y - gap - th < 4;
+    const below = r.y + r.h + gap + th < sh - 4 || r.y - gap - th < 4;
     let top = below ? r.y + r.h + gap : r.y - gap - th;
     if (top + th > sh - 4) top = Math.max(4, sh - th - 4);
     const cx = r.x + r.w / 2;
@@ -1190,10 +1482,36 @@ const strip = h => h.replace(/<[^>]+>/g, '');
 function say(t) { const l = $('#sr-live'); l.textContent = ''; setTimeout(() => { l.textContent = t; }, 30); }
 function shake() { sim.classList.remove('shake'); void sim.offsetWidth; sim.classList.add('shake'); }
 
+/* --- Dialog keputusan (aksi "pilih") --- */
+function buildDecision(st) {
+  $('#dec-q').textContent = st.pertanyaan;
+  const q = $('#dec-quote');
+  q.hidden = !st.kutipan;
+  q.innerHTML = st.kutipan ? `<b>${esc(st.kutipanDari || 'Pesan')}</b>${esc(st.kutipan)}` : '';
+  $('#dec-opts').innerHTML = st.opsi.map(o => `<button type="button" class="opt" id="opt-${o.kunci}" data-akibat="${esc(o.akibat || '')}"><span class="k" aria-hidden="true">${esc(o.kunci.toUpperCase())}</span><span>${esc(o.teks)}</span></button>`).join('');
+  $('#dec-fb').hidden = true; $('#dec-next').hidden = true;
+}
+function decFeedback(kind, title, text) {
+  const f = $('#dec-fb');
+  f.className = 'dec-fb ' + kind; f.innerHTML = `<b>${title}</b>${esc(text)}`; f.hidden = false;
+  ensureVisible(f);                       // layar kecil: pastikan penjelasan terlihat
+  say(title + ' ' + text);
+}
+function chooseRight(opt) {
+  const st = step();
+  S.active = false; clearGuide();
+  opt.classList.add('right'); Sound.pop();
+  if (!st.penjelasan) { S.active = true; completeStep(); return; }
+  decFeedback('good', '✔ Tepat!', st.penjelasan);
+  const n = $('#dec-next'); n.hidden = false; S.awaitNext = true;
+  ensureVisible(n);
+  if (S.mode !== 'demo') n.focus({ preventScroll: true });
+}
+
 /* --- Alur langkah --- */
 async function gotoStep(i) {
   const id = ++S.run;
-  S.active = false; S.i = i; S.wrong = 0; S.typed = 0;
+  S.active = false; S.awaitNext = false; S.i = i; S.wrong = 0; S.typed = 0; S.lastVal = null;
   clearGuide();
   if (S.mode !== 'demo') cursor.classList.remove('on');
   const st = step(), sc = SCENES[st.scene];
@@ -1201,13 +1519,20 @@ async function gotoStep(i) {
   render(sc);
   updateHud();
   if (sc.sound === 'ding') setTimeout(() => alive(id) && Sound.ding(), 280);
-  if (sc.fx && FX[sc.fx]) FX[sc.fx](id);
+  runFx(sc.fx, id);
   fixFocus();
   await sleep(430);                       // tunggu animasi jendela selesai
   if (!alive(id)) return;
+  if (st.aksi === 'pilih') {              // beri waktu membaca layar, lalu munculkan dialog keputusan
+    buildDecision(st);
+    await sleep(900); if (!alive(id)) return;
+    const d = $('#decision'); d.classList.add('open'); d.inert = false;
+    if (S.mode !== 'demo') $('.dec-card').focus({ preventScroll: true });
+    await sleep(320); if (!alive(id)) return;
+  }
   ensureVisible(primary(st));
   S.active = true;
-  if (S.mode === 'try') showGuide('normal');
+  if (S.mode === 'try' && st.aksi !== 'pilih') showGuide('normal');   // keputusan tidak dibocorkan di awal
   if (S.mode === 'demo') runDemo(id);
 }
 function completeStep() {
@@ -1221,7 +1546,7 @@ function wrong(msg) {
   S.wrong++; S.err[S.i] = (S.err[S.i] || 0) + 1; S.totalErr++;
   Sound.buzz(); shake(); updateHud();
   if (S.mode === 'try') {
-    if (S.wrong >= 2) { flash(msg || 'Belum tepat — lihat petunjuk 💡'); showGuide('hint'); pointHint(S.guide.el); }
+    if (S.wrong >= 2) { flash(msg || 'Belum tepat — lihat petunjuk 💡'); showGuide('hint'); if (S.guide) pointHint(S.guide.el); }
     else flash(msg || 'Coba lagi');
   } else {
     flash(msg || 'Belum tepat', 'muted');
@@ -1246,9 +1571,22 @@ screen.addEventListener('click', e => {
     flash('Mode Demo berjalan otomatis. Pilih "Ganti mode" untuk mencoba sendiri.', 'info');
     return;
   }
+  if (e.target.closest('[data-free]')) {  // tombol "Lanjut" setelah keputusan benar
+    e.preventDefault(); e.stopPropagation();
+    if (S.awaitNext) { S.awaitNext = false; S.active = true; completeStep(); }
+    return;
+  }
   if (!S.active) { e.preventDefault(); e.stopPropagation(); return; }
   const st = step();
   const hit = targetsOf(st).find(t => t.contains(e.target));
+  if (st.aksi === 'pilih') {              // hanya klik pada pilihan yang dinilai
+    e.preventDefault(); e.stopPropagation();
+    const opt = e.target.closest('.opt');
+    if (!opt || opt.classList.contains('tried')) return;
+    if (hit) chooseRight(opt);
+    else { opt.classList.add('tried'); decFeedback('bad', '✗ Kurang tepat. Akibatnya:', opt.dataset.akibat); wrong('Kurang tepat — baca akibatnya'); }
+    return;
+  }
   if (hit) {
     if (st.aksi === 'click') {
       e.preventDefault(); e.stopPropagation();
@@ -1262,17 +1600,30 @@ screen.addEventListener('click', e => {
   wrong();
 }, true);
 
-/* --- Mengetik: "tepat" (validasi saat Enter) --- */
+/* --- Mengetik: "tepat" (divalidasi saat Enter / kolom ditinggalkan) --- */
 const norm = s => String(s).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
-$('#url-form').addEventListener('submit', e => {
-  e.preventDefault();
+const parseNum = s => parseFloat(String(s).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.'));
+function validateTyped(el) {
   const st = step();
-  if (!S.active || S.mode === 'demo' || st.aksi !== 'type' || !$(st.target.split(',')[0]).closest('#url-form')) return;
-  const val = $('#url').value;
-  const ok = [st.teks].concat(st.terima || []).some(t => norm(t) === norm(val));
-  if (ok) { Sound.tick(); completeStep(); }
-  else wrong(val.trim() ? 'Alamat belum tepat — periksa ketikan Anda' : 'Kolom alamat masih kosong');
-});
+  if (!S.active || S.mode === 'demo' || st.aksi !== 'type' || st.cocok !== 'tepat' || primary(st) !== el) return;
+  const val = el.value;
+  if (val === S.lastVal) { flash('Ubah dulu isiannya', 'muted'); return; }
+  S.lastVal = val;
+  const answers = [st.teks].concat(st.terima || []);
+  const ok = val.trim() !== '' && (st.format === 'angka'
+    ? answers.some(t => parseNum(t) === parseNum(val))
+    : answers.some(t => norm(t) === norm(val)));
+  if (ok) { Sound.tick(); completeStep(); return; }
+  wrong(!val.trim() ? 'Kolom masih kosong' : (st.format === 'angka' ? 'Angka belum tepat — periksa lagi' : 'Alamat belum tepat — periksa ketikan Anda'));
+  setTimeout(() => el.select(), 0);       // ketikan berikutnya langsung mengganti isi yang salah
+}
+$('#url-form').addEventListener('submit', e => { e.preventDefault(); validateTyped($('#url')); });
+const isCell = el => el && el.classList && el.classList.contains('cell-in');
+sim.addEventListener('keydown', e => { if (e.key === 'Enter' && isCell(e.target)) { e.preventDefault(); validateTyped(e.target); } });
+sim.addEventListener('change', e => { if (isCell(e.target)) validateTyped(e.target); });   // tombol "Selesai" di keyboard HP
+// Klik/fokus kolom angka = seluruh isi terpilih, jadi peserta tinggal mengetik angka baru
+sim.addEventListener('focusin', e => { if (isCell(e.target)) e.target.select(); });
+sim.addEventListener('click', e => { const el = e.target; if (isCell(el)) setTimeout(() => el.select(), 0); });   // ditunda: browser mengatur kursor setelah klik
 /* --- Mengetik: "panduan" (tombol apa saja → 1 kata terisi) --- */
 $('#chat-input').addEventListener('input', e => {
   const st = step(), el = e.target;
@@ -1300,11 +1651,18 @@ async function runDemo(id) {
     const st = step();
     await dsleep(300, id);
     showGuide('normal');
-    await dsleep(1300, id);
+    await dsleep(st.aksi === 'pilih' ? 2600 : 1300, id);   // keputusan: beri waktu membaca pilihan
     const el = primary(st);
     ensureVisible(el); await dsleep(200, id);
     cursorTo(el); await dsleep(850, id);
     rippleOn(el); Sound.tick(); await dsleep(250, id);
+    if (st.aksi === 'pilih') {
+      chooseRight(el);
+      await dsleep(4000, id);
+      const n = $('#dec-next');
+      if (!n.hidden) { cursorTo(n); await dsleep(800, id); rippleOn(n); await dsleep(200, id); }
+      S.awaitNext = false; S.active = true;
+    }
     if (st.aksi === 'type') {
       await typewriter(el, st.teks, id);
       if (st.cocok === 'tepat') { await dsleep(250, id); flash('⏎ Enter', 'info'); await dsleep(500, id); }
@@ -1318,11 +1676,8 @@ async function finish() {
   const id = ++S.run;
   S.tEnd = Date.now();
   updateHud(true);
-  const sc = SCENES[CONFIG.sceneAkhir];
-  if (sc) {
-    render(sc);
-    if (sc.fx && FX[sc.fx]) await FX[sc.fx](id);
-  }
+  const sc = SCENES[S.scn.sceneAkhir];
+  if (sc) { render(sc); await runFx(sc.fx, id); }
   if (!alive(id)) return;
   cursor.classList.remove('on');
   Sound.win();
@@ -1330,20 +1685,24 @@ async function finish() {
 }
 const fmtTime = ms => { const s = Math.round(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
 function stepScore(i) { return S.helped[i] ? 0 : [1, 0.75, 0.5, 0.25][Math.min(S.err[i] || 0, 3)]; }
+function nextScenario() { const i = SCENARIOS.indexOf(S.scn); return SCENARIOS[i + 1] || null; }
 function showEnd() {
-  const n = STEPS.length, sheet = $('#end-sheet');
+  const n = STEPS.length, sheet = $('#end-sheet'), nx = nextScenario();
+  const nxBtn = nx ? `<button type="button" data-act="next">➡ Lanjut: ${esc(nx.judul)}</button>` : '';
   if (S.mode === 'demo') {
     sheet.innerHTML = `<h2 id="end-title">🎬 Demo selesai!</h2>
-      <p class="lead">Anda sudah melihat ${n} langkah memproses PR AI sampai konfirmasi ke supplier. Sekarang giliran Anda mencoba.</p>
-      <div class="end-btns"><button type="button" class="primary" data-act="try">👆 Coba sendiri</button><button type="button" data-act="test">📝 Langsung Uji</button><button type="button" data-act="again">↺ Ulangi demo</button></div>`;
+      <p class="lead">${esc(S.scn.judul)}: ${esc(S.scn.ringkasan)} Sekarang giliran Anda mencoba.</p>
+      <div class="end-btns"><button type="button" class="primary" data-act="try">👆 Coba sendiri</button><button type="button" data-act="test">📝 Langsung Uji</button><button type="button" data-act="again">↺ Ulangi demo</button><button type="button" data-act="mode">🔀 Skenario lain</button></div>`;
   } else {
     const score = Math.round(STEPS.reduce((s, _, i) => s + stepScore(i), 0) / n * 100);
     const passed = score >= CONFIG.nilaiLulus, test = S.mode === 'test';
     const clean = STEPS.filter((_, i) => !(S.err[i] || 0) && !S.helped[i]).length;
-    SCORM.report(S.mode, score, passed);
+    if (test) S.best[S.scn.id] = Math.max(S.best[S.scn.id] || 0, score);
+    SCORM.report(S.mode, score, passed, S.best);
     const color = score >= CONFIG.nilaiLulus ? '#16a34a' : score >= 60 ? '#f59e0b' : '#dc2626';
+    const doneTests = SCENARIOS.filter(s => s.id in S.best).map(s => `${esc(s.judul)} (${S.best[s.id]})`);
     sheet.innerHTML = `<h2 id="end-title">${test ? (passed ? '🎉 Selamat, Anda lulus!' : '📘 Belum lulus, ayo coba lagi') : '✅ Latihan selesai!'}</h2>
-      <p class="lead">${test ? `Nilai minimal lulus: ${CONFIG.nilaiLulus}.` : 'Ini nilai latihan (tidak dikirim sebagai nilai tes).'} PR ${D.pr} sudah diproses menjadi PO ${D.po} dan supplier sudah mengonfirmasi.</p>
+      <p class="lead"><b>${esc(S.scn.judul)}.</b> ${test ? `Nilai minimal lulus: ${CONFIG.nilaiLulus}.` : 'Ini nilai latihan (tidak dikirim sebagai nilai tes).'} ${esc(S.scn.ringkasan)}</p>
       <div class="score"><div class="circle" style="--p:${score};--c:${color}"><span>${score}</span></div>
         <div class="stats">
           <div class="stat"><b>${fmtTime(S.tEnd - S.t0)}</b><span>Waktu</span></div>
@@ -1352,8 +1711,10 @@ function showEnd() {
           <div class="stat"><span class="verdict ${test ? (passed ? 'pass' : 'fail') : 'neutral'}">${test ? (passed ? 'LULUS' : 'BELUM LULUS') : 'LATIHAN'}</span></div>
         </div></div>
       <ol class="steplist">${STEPS.map((s, i) => `<li>${S.helped[i] ? '🆘' : (S.err[i] ? '⚠️' : '✅')} ${esc(strip(s.tugas))}${S.err[i] ? ` <span class="muted">(${S.err[i]}× salah${S.helped[i] ? ', dibantu' : ''})</span>` : ''}</li>`).join('')}</ol>
-      <p class="note">Cara hitung: tiap langkah bernilai 1 (tanpa salah), 0,75 (1× salah), 0,5 (2×), 0,25 (3× atau lebih), 0 bila dibantu petunjuk.${SCORM.connected ? ' Nilai sudah dikirim ke LMS.' : ''}</p>
-      <div class="end-btns">${test ? '' : '<button type="button" class="primary" data-act="test">📝 Lanjut ke Uji</button>'}<button type="button" ${test ? 'class="primary"' : ''} data-act="again">↺ Ulangi</button><button type="button" data-act="mode">⇄ Ganti mode</button></div>`;
+      <p class="note">Cara hitung: tiap langkah bernilai 1 (tanpa salah), 0,75 (1× salah), 0,5 (2×), 0,25 (3× atau lebih), 0 bila dibantu petunjuk.
+        ${doneTests.length ? `Skenario yang sudah diuji: ${doneTests.join(', ')} — ${doneTests.length}/${SCENARIOS.length}.` : ''}
+        ${SCORM.connected ? (CONFIG.wajibSemuaSkenario ? ' Status LMS: lulus bila semua skenario sudah diuji dan semuanya ≥ nilai lulus.' : ' Nilai sudah dikirim ke LMS.') : ''}</p>
+      <div class="end-btns">${test ? '' : '<button type="button" class="primary" data-act="test">📝 Lanjut ke Uji</button>'}${test && nx ? nxBtn.replace('type="button"', 'type="button" class="primary"') : ''}<button type="button" data-act="again">↺ Ulangi</button><button type="button" data-act="mode">🔀 Skenario / mode lain</button></div>`;
   }
   showOverlay('ov-end');
 }
@@ -1362,10 +1723,11 @@ $('#end-sheet').addEventListener('click', e => {
   const a = b.dataset.act;
   if (a === 'again') startMode(S.mode);
   else if (a === 'mode') openModePicker();
+  else if (a === 'next') { S.scn = nextScenario() || S.scn; startMode(S.mode); }
   else startMode(a);
 });
 
-/* --- Overlay & mode --- */
+/* --- Overlay, skenario & mode --- */
 function showOverlay(idName) {
   $$('.overlay').forEach(o => { const on = o.id === idName; o.classList.toggle('on', on); o.inert = !on; });
   sim.inert = true;
@@ -1375,17 +1737,30 @@ function hideOverlays() {
   $$('.overlay').forEach(o => { o.classList.remove('on'); o.inert = true; });
   sim.inert = S.mode === 'demo';
 }
+function buildScenarioPicker() {
+  $('#scn-list').innerHTML = SCENARIOS.map(s => `<button type="button" data-scn="${s.id}" aria-pressed="${s === S.scn}">${s.id in S.best ? '✓ ' : ''}${esc(s.judul)}</button>`).join('');
+  $('#scn-desc').textContent = S.scn.deskripsi || '';
+  $('#learn-list').innerHTML = (S.scn.pelajari || []).map(x => `<li>${esc(x)}</li>`).join('');
+}
+$('#scn-list').addEventListener('click', e => {
+  const b = e.target.closest('[data-scn]'); if (!b) return;
+  S.scn = SCENARIOS.find(s => s.id === b.dataset.scn);
+  buildScenarioPicker();
+  $(`[data-scn="${S.scn.id}"]`).focus();
+});
 function openModePicker() {
-  ++S.run; S.active = false; clearGuide(); cursor.classList.remove('on');
+  ++S.run; S.active = false; S.awaitNext = false; clearGuide(); cursor.classList.remove('on');
+  buildScenarioPicker();
   showOverlay('ov-start');
 }
 function startMode(mode) {
   Sound.unlock();
+  STEPS = S.scn.langkah;
   Object.assign(S, { mode, paused: false, err: [], helped: [], totalErr: 0, t0: Date.now(), tEnd: 0 });
   document.body.dataset.mode = mode;
   const chip = $('#mode-chip');
   chip.className = 'chip ' + mode;
-  chip.textContent = { demo: '👀 Mode Lihat', try: '👆 Mode Coba', test: '📝 Mode Uji' }[mode];
+  chip.textContent = { demo: '👀 Lihat', try: '👆 Coba', test: '📝 Uji' }[mode] + ' · ' + S.scn.judul;
   $('#btn-pause').hidden = mode !== 'demo';
   setPause(false);
   cursor.classList.toggle('on', mode === 'demo');
@@ -1452,14 +1827,24 @@ tickClock();
 $('#prog-txt').textContent = `Langkah 0/${STEPS.length}`;
 sim.inert = true;
 const lms = SCORM.init();
-if (lms) {   // batas lulus dari LMS (adlcp:masteryscore) diutamakan agar nilai di layar = status di LMS
+if (lms) {
+  // batas lulus dari LMS (adlcp:masteryscore) diutamakan agar nilai di layar = status di LMS
   const ms = parseFloat(SCORM.get('cmi.student_data.mastery_score'));
   if (ms >= 0 && ms <= 100) CONFIG.nilaiLulus = ms;
+  try { const sd = JSON.parse(SCORM.get('cmi.suspend_data') || '{}'); if (sd.best) S.best = sd.best; } catch (e) { /* abaikan */ }
 }
+buildScenarioPicker();
 $('#lms-status').textContent = lms ? `LMS: terhubung (SCORM 1.2) · batas lulus ${CONFIG.nilaiLulus}` : 'LMS: tidak terhubung — berjalan mandiri';
 window.addEventListener('pagehide', () => SCORM.finish());
 window.addEventListener('beforeunload', () => SCORM.finish());
-STEPS.forEach(s => { if (!SCENES[s.scene]) console.warn('Langkah "' + s.id + '" memakai scene yang belum ada:', s.scene); });
+// Pemeriksaan data saat dibuka: lihat Console (F12) bila menambah langkah
+SCENARIOS.forEach(sc => {
+  if (!SCENES[sc.sceneAkhir]) console.warn(`Skenario "${sc.id}": sceneAkhir "${sc.sceneAkhir}" belum ada`);
+  sc.langkah.forEach(s => {
+    if (!SCENES[s.scene]) console.warn(`Skenario "${sc.id}", langkah "${s.id}": scene "${s.scene}" belum ada`);
+    if (s.aksi === 'pilih' && !(s.opsi || []).some(o => '#opt-' + o.kunci === s.target)) console.warn(`Langkah "${s.id}": target harus "#opt-<kunci>" milik opsi yang benar`);
+  });
+});
 })();
 </script>
 </body>
